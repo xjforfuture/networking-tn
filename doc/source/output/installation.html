@@ -1,0 +1,260 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Fortigate plugin for OpenStack Neutron &#8212; networking-fortinet  documentation</title>
+    <link rel="stylesheet" href="_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/tweaks.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Contributing" href="contributing.html" />
+    <link rel="prev" title="networking-fortinet" href="readme.html" /> 
+  </head>
+  <body>
+  <div id="header">
+    <h1 id="logo"><a href="http://www.openstack.org/">OpenStack</a></h1>
+    <ul id="navigation">
+      
+      <li><a href="http://www.openstack.org/" title="Go to the Home page" class="link">Home</a></li>
+      <li><a href="http://www.openstack.org/projects/" title="Go to the OpenStack Projects page">Projects</a></li>
+      <li><a href="http://www.openstack.org/user-stories/" title="Go to the User Stories page" class="link">User Stories</a></li>
+      <li><a href="http://www.openstack.org/community/" title="Go to the Community page" class="link">Community</a></li>
+      <li><a href="http://www.openstack.org/blog/" title="Go to the OpenStack Blog">Blog</a></li>
+      <li><a href="http://wiki.openstack.org/" title="Go to the OpenStack Wiki">Wiki</a></li>
+      <li><a href="http://docs.openstack.org/" title="Go to OpenStack Documentation" class="current">Documentation</a></li>
+      
+    </ul>
+  </div>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="fortigate-plugin-for-openstack-neutron">
+<h1>Fortigate plugin for OpenStack Neutron<a class="headerlink" href="#fortigate-plugin-for-openstack-neutron" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="general">
+<h2>1. General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h2>
+<p>This is an installation guide for enabling Fortigate support on OpenStack.</p>
+<p>This guide does not necessarily cover all OpenStack installation steps especially
+at production scale.</p>
+<p>Please note this instruction only applies to liberty or master version of OpenStack.</p>
+</div>
+<div class="section" id="prerequisites">
+<h2>2. Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+<p>The prerequisites for installing Fortigate pluggin for OpenStack are the
+following:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li>at least 3 machines, physical or vm, with at least 2 core cpu and 4G
+ram, including 1 controller, 1 compute, 1 fortigate.</li>
+<li>Controller and compute nodes are installed with Ubuntu 14.04 or CentOS7.</li>
+<li>Fortigate is 5.2.3 GA version and up til 5.6. Clean configuration with only control IP.</li>
+<li>3 virtual switches(ESXI vswitch or linux bridge) or physical switches/vlans:
+1 for control plane, 1 for tenant network, 1 for external network. Vlanids are
+allowed on the switches and enable promisc mode. http and https access are allowed
+on Fortigate’s control interface.</li>
+<li>Controller has at least 1 nic on control plane with Internet access.</li>
+<li>Compute node has at least 2 nics, one on control plane and the other on tenant
+network.</li>
+<li>Fortigate has at least 3 nics, 1 for control plane, 1 for tenant network and 1 for
+external. There should be NO references on the ports for tenant and external network.
+Backup the clean configuration of Fortigate to local machine for later restoration.</li>
+</ol>
+</div></blockquote>
+</div>
+<div class="section" id="openstack-fortigate-plugin-installation">
+<h2>3. OpenStack+Fortigate plugin Installation<a class="headerlink" href="#openstack-fortigate-plugin-installation" title="Permalink to this headline">¶</a></h2>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">3.1 Using devstack:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+<p>In this scenario, Fortigate plugin will be installed along with OpenStack using devstack</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li>ssh to controller node with sudo privilege and install git.</li>
+<li>git clone <a class="reference external" href="https://git.openstack.org/openstack-dev/devstack">https://git.openstack.org/openstack-dev/devstack</a></li>
+<li>git clone <a class="reference external" href="https://git.openstack.org/openstack/networking-fortinet">https://git.openstack.org/openstack/networking-fortinet</a></li>
+<li>cd devstack; sudo tools/create-stack-user.sh if you don’t have a stack user with sudo privilege.</li>
+<li>Use <code class="docutils literal"><span class="pre">networking-fortinet/devstack/local.conf.example.controller</span></code> and <code class="docutils literal"><span class="pre">networking-fortinet/devstack/local.conf.example.compute</span></code> as and example to create local.conf for control and compute nodes or use <code class="docutils literal"><span class="pre">networking-fortinet/devstack/local.conf.example.aio</span></code> for all-in-one node and set the required parameters in the local.conf based on the your setup. Items that need to be changed is decorated with CHANGEME.</li>
+<li>Run ./stack.sh on controller first and then compute. Remember to get Fortigate ready before running stack.sh.</li>
+</ol>
+</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">3.2 On a setup with OpenStack already installed:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+<p>In this scenario, Fortigate pluggin will be installed on a setup which has already OpenStack installed:</p>
+<p>On the controller node:</p>
+<ol class="arabic simple">
+<li>pip install git+git://git.openstack.org/openstack/networking-fortinet</li>
+<li>The following modifications are needed in:</li>
+</ol>
+<blockquote>
+<div><div class="highlight-default"><div class="highlight"><pre><span></span><span class="mf">2.1</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">neutron</span><span class="o">/</span><span class="n">plugins</span><span class="o">/</span><span class="n">ml2</span><span class="o">/</span><span class="n">ml2_conf</span><span class="o">.</span><span class="n">ini</span>
+
+<span class="p">[</span><span class="n">ml2</span><span class="p">]</span>
+<span class="n">tenant_network_types</span> <span class="o">=</span> <span class="n">vlan</span>
+<span class="n">extension_drivers</span> <span class="o">=</span> <span class="n">port_security</span>
+<span class="n">type_drivers</span> <span class="o">=</span> <span class="n">local</span><span class="p">,</span><span class="n">flat</span><span class="p">,</span><span class="n">vlan</span><span class="p">,</span><span class="n">gre</span><span class="p">,</span><span class="n">vxlan</span>
+<span class="n">mechanism_drivers</span> <span class="o">=</span> <span class="n">fortinet</span><span class="p">,</span><span class="n">openvswitch</span>
+
+<span class="p">[</span><span class="n">ml2_type_vlan</span><span class="p">]</span>
+<span class="n">network_vlan_ranges</span> <span class="o">=</span> <span class="n">physnet1</span><span class="p">:</span><span class="mi">1009</span><span class="p">:</span><span class="mi">2099</span> <span class="c1">## vlanid range according to your setup</span>
+
+<span class="p">[</span><span class="n">ovs</span><span class="p">]</span>
+<span class="n">bridge_mappings</span> <span class="o">=</span> <span class="n">physnet1</span><span class="p">:</span><span class="n">br</span><span class="o">-</span><span class="n">eth2</span> <span class="c1">## the ovs bridge with internal nic for tenant network</span>
+
+<span class="p">[</span><span class="n">ml2_fortinet</span><span class="p">]</span>
+<span class="n">npu_available</span> <span class="o">=</span> <span class="kc">True</span> <span class="c1">## if fortigate have hardware npu acceleration, set to True, otherwise, False</span>
+<span class="n">tenant_network_type</span> <span class="o">=</span> <span class="n">vlan</span>
+<span class="n">ext_interface</span> <span class="o">=</span> <span class="n">portx</span> <span class="c1">## port for external traffic</span>
+<span class="n">int_interface</span> <span class="o">=</span> <span class="n">portx</span> <span class="c1">## port for tenant traffic</span>
+<span class="n">password</span> <span class="o">=</span>  <span class="c1">## fortigate admin password</span>
+<span class="n">username</span> <span class="o">=</span> <span class="n">admin</span> <span class="c1">## fortigate admin username</span>
+<span class="n">protocol</span> <span class="o">=</span> <span class="n">https</span> <span class="c1">## if https redirect is enabled(default)</span>
+<span class="n">port</span> <span class="o">=</span> <span class="mi">443</span> <span class="c1">## if https redirect is enabled(default)</span>
+<span class="n">address</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">x</span> <span class="c1">## IP address of fortigate control IP, must enable https,http access</span>
+
+<span class="n">L3</span> <span class="n">agent</span>  <span class="o">-</span> <span class="n">must</span> <span class="n">be</span> <span class="n">disabled</span>
+<span class="n">DHCP</span> <span class="n">service</span> <span class="o">-</span> <span class="n">must</span> <span class="n">be</span> <span class="n">disabled</span>
+<span class="n">OVS</span> <span class="n">agent</span> <span class="o">-</span> <span class="n">must</span> <span class="n">be</span> <span class="n">enabled</span>
+
+<span class="mf">2.2</span> <span class="n">neutron</span><span class="o">.</span><span class="n">conf</span><span class="p">:</span>
+
+<span class="p">[</span><span class="n">DEFAULT</span><span class="p">]</span>
+<span class="n">service_plugins</span> <span class="o">=</span> <span class="n">router_fortinet</span><span class="p">,</span><span class="n">fwaas_fortinet</span> <span class="c1">## If fortigate is used to provide fwaas, add fwaas_fortinet here.</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic" start="4">
+<li><p class="first">neutron-db-manage –config-file /etc/neutron/neutron.conf –config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head</p>
+</li>
+<li><p class="first">restart neutron server service. service neutron-server restart or systemctl restart neutron-server</p>
+</li>
+<li><p class="first">If you don’t have existing configuration, you are done here, but if not, you have existing configuration including networks, subnets, routers, ports and VMs based on tenant network of VLAN type and you want to preserve them, run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ fortinet_migration
+</pre></div>
+</div>
+</li>
+<li><p class="first">After the migration, shutdown network node completely if you have a seperate network node. If network node(L3 agent, DHCP agent, Metadata agent) co-exists with controller or compute node, disable L3,DHCP,Metadata agent services and reboot the node.</p>
+</li>
+</ol>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+<div class="sphinxsidebar">
+    <div class="sphinxsidebarwrapper">
+            <h3>Table Of Contents</h3>
+            <ul><li><a href="index.html">Return to project home page</a></li></ul>
+            <ul>
+<li><a class="reference internal" href="#">Fortigate plugin for OpenStack Neutron</a><ul>
+<li><a class="reference internal" href="#general">1. General</a></li>
+<li><a class="reference internal" href="#prerequisites">2. Prerequisites</a></li>
+<li><a class="reference internal" href="#openstack-fortigate-plugin-installation">3. OpenStack+Fortigate plugin Installation</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="readme.html"
+                                  title="previous chapter">networking-fortinet</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="contributing.html"
+                                  title="next chapter">Contributing</a></p>
+            <h3>Project Source</h3>
+            <ul class="this-page-menu">
+              <li><a href="http://git.openstack.org/cgit/xjforfuture/networking-ngfw
+"
+                     rel="nofollow">Project Source</a></li>
+            </ul>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/installation.rst.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+    </div>
+</div>
+
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="contributing.html" title="Contributing"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="readme.html" title="networking-fortinet"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">networking-fortinet  documentation</a> &#187;</li> 
+      </ul>
+    </div>
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2015, OpenStack Foundation.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.6.5.
+    </div>
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+//Tracking docs.openstack.org/developer/<projectname> only
+//The URL is built from the project variable in conf.py
+var pageTracker = _gat._getTracker("UA-17511903-1");
+pageTracker._setCookiePath("/developer/networking-fortinet");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </body>
+</html>
