@@ -24,9 +24,9 @@ try:
 except Exception:
     import logging
 
-from fortiosclient import base
-from fortiosclient.common import constants as csts
-from fortiosclient import eventlet_request
+from networking_tn.tnosclient import base
+from networking_tn.tnosclient.common import constants as csts
+from networking_tn.tnosclient import eventlet_request
 
 LOG = logging.getLogger(__name__)
 

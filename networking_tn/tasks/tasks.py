@@ -23,10 +23,10 @@ from oslo_log import log as logging
 from oslo_service import loopingcall
 import six
 
-from networking_fortinet._i18n import _, _LE, _LI
-from networking_fortinet.common import resources
-from networking_fortinet.common import singleton
-from networking_fortinet.tasks import constants
+from networking_tn._i18n import _, _LE, _LI
+from networking_tn.common import resources
+from networking_tn.common import singleton
+from networking_tn.tasks import constants
 
 
 DEFAULT_INTERVAL = 1000

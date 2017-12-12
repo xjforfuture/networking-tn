@@ -18,7 +18,6 @@
 import abc
 import copy
 import eventlet
-from pudb import set_trace
 
 try:
     import httplib as httpclient
@@ -39,9 +38,9 @@ except Exception:
 import six
 import six.moves.urllib.parse as urlparse
 
-from fortiosclient._i18n import _LI, _LW
-import fortiosclient as api_client
-from fortiosclient import templates
+from networking_tn.tnosclient._i18n import _LI, _LW
+import networking_tn.tnosclient as api_client
+from networking_tn.tnosclient import templates
 
 LOG = logging.getLogger(__name__)
 

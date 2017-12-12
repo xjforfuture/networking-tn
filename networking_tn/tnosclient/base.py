@@ -30,8 +30,8 @@ except Exception:
 
 import six
 
-from fortiosclient._i18n import _LE, _LI, _LW
-import fortiosclient as api_client
+from networking_tn.tnosclient._i18n import _LE, _LI, _LW
+import networking_tn.tnosclient as api_client
 
 
 LOG = logging.getLogger(__name__)

@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from fortiosclient import exception as api_ex
+from networking_tn.tnosclient import exception as api_ex
 import inspect
 import os
 from oslo_log import log as logging
@@ -21,8 +21,8 @@ import six
 import sys
 import types
 
-from networking_fortinet._i18n import _LE
-from networking_fortinet.common import constants as const
+from networking_tn._i18n import _LE
+from networking_tn.common import constants as const
 
 
 LOG = logging.getLogger(__name__)

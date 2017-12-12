@@ -16,7 +16,7 @@
 #
 
 
-from fortiosclient._i18n import _
+from networking_tn.tnosclient._i18n import _
 
 
 class ApiException(Exception):

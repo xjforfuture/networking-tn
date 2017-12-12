@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from fortiosclient import exception
+from networking_tn.tnosclient import exception
 import netaddr
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
@@ -21,10 +21,10 @@ from neutron.db.models import l3 as l3_db
 from neutron.db.models import segment as segments_db
 from neutron.db import models_v2
 
-from networking_fortinet.common import constants as const
-from networking_fortinet.common import resources as resources
-from networking_fortinet.db import models as fortinet_db
-from networking_fortinet.tasks import constants as t_consts
+from networking_tn.common import constants as const
+from networking_tn.common import resources as resources
+from networking_tn.db import models as fortinet_db
+from networking_tn.tasks import constants as t_consts
 
 LOG = logging.getLogger(__name__)
 

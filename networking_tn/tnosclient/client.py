@@ -26,13 +26,13 @@ try:
 except Exception:
     import json as jsonutils
 
-from fortiosclient._i18n import _LE, _LW
-from fortiosclient.common import constants as csts
-from fortiosclient.common import singleton
-from fortiosclient import eventlet_client
-from fortiosclient import eventlet_request
-from fortiosclient import exception
-from fortiosclient import templates
+from networking_tn.tnosclient._i18n import _LE, _LW
+from networking_tn.tnosclient.common import constants as csts
+from networking_tn.tnosclient.common import singleton
+from networking_tn.tnosclient import eventlet_client
+from networking_tn.tnosclient import eventlet_request
+from networking_tn.tnosclient import exception
+from networking_tn.tnosclient import templates
 
 LOG = logging.getLogger(__name__)
 

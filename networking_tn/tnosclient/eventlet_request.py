@@ -30,10 +30,10 @@ try:
 except Exception:
     import json as jsonutils
 
-from fortiosclient._i18n import _LI, _LW
-from fortiosclient.common import constants as csts
-from fortiosclient import request
-from fortiosclient import templates
+from networking_tn.tnosclient._i18n import _LI, _LW
+from networking_tn.tnosclient.common import constants as csts
+from networking_tn.tnosclient import request
+from networking_tn.tnosclient import templates
 
 LOG = logging.getLogger(__name__)
 

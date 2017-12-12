@@ -12,12 +12,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from fortiosclient import client
+from networking_tn.tnosclient import client
 from oslo_config import cfg
 
-from networking_fortinet._i18n import _
+from networking_tn._i18n import _
 
-ML2_FORTINET = [
+ML2_TN = [
     cfg.StrOpt('address', default='',
                help=_('The address of fortigates to connect to')),
     cfg.StrOpt('port', default='443',
@@ -65,33 +65,33 @@ ML2_FORTINET = [
                      'the profile must exist in FGT, default is ""'))
 ]
 
-cfg.CONF.register_opts(ML2_FORTINET, "ml2_fortinet")
+cfg.CONF.register_opts(ML2_TN, "ml2_tn")
 
-fgt_info = {
-    'address': cfg.CONF.ml2_fortinet.address,
-    'port': cfg.CONF.ml2_fortinet.port,
-    'protocol': cfg.CONF.ml2_fortinet.protocol,
-    'username': cfg.CONF.ml2_fortinet.username,
-    'password': cfg.CONF.ml2_fortinet.password,
-    'int_interface': cfg.CONF.ml2_fortinet.int_interface,
-    'ext_interface': cfg.CONF.ml2_fortinet.ext_interface,
-    'tenant_network_type': cfg.CONF.ml2_fortinet.tenant_network_type,
-    'vlink_vlan_id_range': cfg.CONF.ml2_fortinet.vlink_vlan_id_range,
-    'vlink_ip_range': cfg.CONF.ml2_fortinet.vlink_ip_range,
-    'vip_mappedip_range': cfg.CONF.ml2_fortinet.vip_mappedip_range,
-    'npu_available': cfg.CONF.ml2_fortinet.npu_available,
-    'enable_default_fwrule': cfg.CONF.ml2_fortinet.enable_default_fwrule,
-    'av_profile': cfg.CONF.ml2_fortinet.av_profile,
-    'webfilter_profile': cfg.CONF.ml2_fortinet.webfilter_profile,
-    'ips_sensor': cfg.CONF.ml2_fortinet.ips_sensor,
-    'application_list': cfg.CONF.ml2_fortinet.application_list,
-    'ssl_ssh_profile': cfg.CONF.ml2_fortinet.ssl_ssh_profile
+tn_info = {
+    'address': cfg.CONF.ml2_tn.address,
+    'port': cfg.CONF.ml2_tn.port,
+    'protocol': cfg.CONF.ml2_tn.protocol,
+    'username': cfg.CONF.ml2_tn.username,
+    'password': cfg.CONF.ml2_tn.password,
+    'int_interface': cfg.CONF.ml2_tn.int_interface,
+    'ext_interface': cfg.CONF.ml2_tn.ext_interface,
+    'tenant_network_type': cfg.CONF.ml2_tn.tenant_network_type,
+    'vlink_vlan_id_range': cfg.CONF.ml2_tn.vlink_vlan_id_range,
+    'vlink_ip_range': cfg.CONF.ml2_tn.vlink_ip_range,
+    'vip_mappedip_range': cfg.CONF.ml2_tn.vip_mappedip_range,
+    'npu_available': cfg.CONF.ml2_tn.npu_available,
+    'enable_default_fwrule': cfg.CONF.ml2_tn.enable_default_fwrule,
+    'av_profile': cfg.CONF.ml2_tn.av_profile,
+    'webfilter_profile': cfg.CONF.ml2_tn.webfilter_profile,
+    'ips_sensor': cfg.CONF.ml2_tn.ips_sensor,
+    'application_list': cfg.CONF.ml2_tn.application_list,
+    'ssl_ssh_profile': cfg.CONF.ml2_tn.ssl_ssh_profile
 }
 
 
 def get_apiclient():
     """Fortinet api client initialization."""
-    api_server = [(fgt_info['address'], fgt_info['port'],
-                  'https' == fgt_info['protocol'])]
+    api_server = [(tn_info['address'], tn_info['port'],
+                  'https' == tn_info['protocol'])]
     return client.FortiosApiClient(
-        api_server, fgt_info['username'], fgt_info['password'])
+        api_server, tn_info['username'], tn_info['password'])

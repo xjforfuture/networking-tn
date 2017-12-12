@@ -51,8 +51,7 @@ SUPPORTED_DR = ['vlan']
 cfg.CONF(args=CFG_ARGS, project='neutron',
          version='%%prog %s' % version.version_info.release_string(),
          **CFG_KWARGS)
-cfg.CONF.import_group('ml2_fortinet',
-                'networking_fortinet.common.config')
+cfg.CONF.import_group('ml2_tn', 'networking_tn.common.config')
 
 from networking_tn.common import resources
 from networking_tn.common import utils

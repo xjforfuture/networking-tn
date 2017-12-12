@@ -24,7 +24,7 @@ import sqlalchemy as sa
 from sqlalchemy.inspection import inspect
 from sqlalchemy import orm
 
-from networking_fortinet.common import constants as const
+from networking_tn.common import constants as const
 
 
 OPS = ["ADD", "UPDATE", "DELETE", "QUERY"]

@@ -30,14 +30,14 @@ from neutron.db import models_v2
 
 from neutron.plugins.ml2.common import exceptions as ml2_exc
 
-from networking_fortinet._i18n import _, _LE, _LI
-from networking_fortinet.common import config
-from networking_fortinet.common import constants as const
-from networking_fortinet.common import resources as resources
-from networking_fortinet.common import utils
-from networking_fortinet.db import models as fortinet_db
-from networking_fortinet.tasks import constants as t_consts
-from networking_fortinet.tasks import tasks
+from networking_tn._i18n import _, _LE, _LI
+from networking_tn.common import config
+from networking_tn.common import constants as const
+from networking_tn.common import resources as resources
+from networking_tn.common import utils
+from networking_tn.db import models as tn_db
+from networking_tn.tasks import constants as t_consts
+from networking_tn.tasks import tasks
 
 
 LOG = logging.getLogger(__name__)
@@ -98,17 +98,17 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
         utils.update_status(self, session, t_consts.TaskStatus.COMPLETED)
 
     def sync_conf_to_db(self, param):
-        cls = getattr(fortinet_db, const.FORTINET_PARAMS[param]['cls'])
+        cls = getattr(tn_db, const.FORTINET_PARAMS[param]['cls'])
         conf_list = self.get_range(param)
         session = db_api.get_session()
-        records = fortinet_db.query_records(session, cls)
+        records = tn_db.query_records(session, cls)
         for record in records:
             kwargs = {}
             for key in const.FORTINET_PARAMS[param]['keys']:
                 _element = const.FORTINET_PARAMS[param]['type'](record[key])
                 if _element not in conf_list and not record.allocated:
                     kwargs.setdefault(key, record[key])
-                    fortinet_db.delete_record(session, cls, **kwargs)
+                    tn_db.delete_record(session, cls, **kwargs)
         try:
             for i in range(0, len(conf_list),
                            len(const.FORTINET_PARAMS[param]['keys'])):
@@ -196,13 +196,13 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
             # before delete namespace
             return
         tenant_id = network['tenant_id']
-        namespace = fortinet_db.query_record(context,
-                                    fortinet_db.Fortinet_ML2_Namespace,
+        namespace = tn_db.query_record(context,
+                                       tn_db.Fortinet_ML2_Namespace,
                                     tenant_id=tenant_id)
         if not namespace:
             return
-        records = fortinet_db.query_records(context,
-            fortinet_db.Fortinet_Interface, network_id=network['id'])
+        records = tn_db.query_records(context,
+                    tn_db.Fortinet_Interface, network_id=network['id'])
         for record in records:
             try:
                 utils.delete_vlanintf(self, context, name=record.name,
@@ -271,7 +271,7 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
             router_func = utils.add_routerstatic
             dhcp_func = utils.add_dhcpserver
         try:
-            if fortinet_db.query_record(context, ext_db.ExternalNetwork,
+            if tn_db.query_record(context, ext_db.ExternalNetwork,
                                         network_id=network_id):
 
                 router_func(self, context,
@@ -281,8 +281,8 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
                             device=self._fortigate['ext_interface'],
                             gateway=gateway)
             else:
-                namespace = fortinet_db.query_record(context,
-                                        fortinet_db.Fortinet_ML2_Namespace,
+                namespace = tn_db.query_record(context,
+                                        tn_db.Fortinet_ML2_Namespace,
                                         tenant_id=tenant_id)
                 interface = utils.get_intf(context,
                                            mech_context.current['network_id'])
@@ -301,8 +301,8 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
                           end_ip=end_ip)
 
                 # TODO(samsu): need to add rollback for the update and set
-                cls = fortinet_db.Fortinet_Interface
-                record = fortinet_db.query_record(context, cls,
+                cls = tn_db.Fortinet_Interface
+                record = tn_db.query_record(context, cls,
                                                   name=interface,
                                                   vdom=namespace.vdom)
                 if gateway:
@@ -350,17 +350,17 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
         port = mech_context.current
         LOG.debug("create_port_precommit mech_context = %s", mech_context)
         context = mech_context._plugin_context
-        namespace = fortinet_db.query_record(context,
-                            fortinet_db.Fortinet_ML2_Namespace,
+        namespace = tn_db.query_record(context,
+                            tn_db.Fortinet_ML2_Namespace,
                             tenant_id=port['tenant_id'])
         port_id = port['id']
         subnet_id = port['fixed_ips'][0]['subnet_id']
         ip_address = port['fixed_ips'][0]['ip_address']
         mac = port['mac_address']
-        db_subnetv2 = fortinet_db.query_record(context, models_v2.Subnet,
+        db_subnetv2 = tn_db.query_record(context, models_v2.Subnet,
                                              id=subnet_id)
         if port['device_owner'] in ['network:router_gateway']:
-            if fortinet_db.query_record(context, ext_db.ExternalNetwork,
+            if tn_db.query_record(context, ext_db.ExternalNetwork,
                                         network_id=port['network_id']):
                 utils.set_ext_gw(self, context, port)
         elif port['device_owner'] in ['compute:nova', 'compute:None', '']:
@@ -409,13 +409,13 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
         try:
             port_id = port['id']
             subnet_id = port['fixed_ips'][0]['subnet_id']
-            db_subnet = fortinet_db.query_record(context,
-                                             fortinet_db.Fortinet_ML2_Subnet,
+            db_subnet = tn_db.query_record(context,
+                                             tn_db.Fortinet_ML2_Subnet,
                                              subnet_id=subnet_id)
-            db_subnetv2 = fortinet_db.query_record(context, models_v2.Subnet,
+            db_subnetv2 = tn_db.query_record(context, models_v2.Subnet,
                                                    id=subnet_id)
             if port['device_owner'] in ['network:router_gateway']:
-                if fortinet_db.query_record(context, ext_db.ExternalNetwork,
+                if tn_db.query_record(context, ext_db.ExternalNetwork,
                                             network_id=port['network_id']):
                     #delete ippool and its related firewall policy
                     utils.clr_ext_gw(self, context, port)
