@@ -54,13 +54,13 @@ cfg.CONF(args=CFG_ARGS, project='neutron',
 cfg.CONF.import_group('ml2_fortinet',
                 'networking_fortinet.common.config')
 
-from networking_ngfw.common import resources
-from networking_ngfw.common import utils
-from networking_ngfw.ml2 import mech_fortinet
-from networking_ngfw.services.l3_router import l3_fortinet
-from networking_ngfw.tasks import tasks
-from networking_ngfw.tasks import constants as t_consts
-from networking_ngfw.db import models as ngfw_db
+from networking_tn.common import resources
+from networking_tn.common import utils
+from networking_tn.ml2 import mech_fortinet
+from networking_tn.services.l3_router import l3_fortinet
+from networking_tn.tasks import tasks
+from networking_tn.tasks import constants as t_consts
+from networking_tn.db import models as tn_db
 
 class Progress(object):
     def __init__(self, total, name=''):
@@ -134,8 +134,8 @@ class Fake_FortinetL3ServicePlugin(l3_fortinet.FortinetL3ServicePlugin):
 
     def add_router_interface(self, context, port):
         """creates vlnk on the fortinet device."""
-        db_namespace = ngfw_db.query_record(context,
-                                ngfw_db.Fortinet_ML2_Namespace,
+        db_namespace = tn_db.query_record(context,
+                                tn_db.Fortinet_ML2_Namespace,
                                 tenant_id=port['tenant_id'])
         vlan_inf = utils.get_intf(context, port['network_id'])
         int_intf, ext_intf = utils.get_vlink_intf(self, context,
@@ -147,7 +147,7 @@ class Fake_FortinetL3ServicePlugin(l3_fortinet.FortinetL3ServicePlugin):
                            nat='enable')
 
     def _get_floatingip(self, context, id):
-        return ngfw_db.query_record(context, l3_db.FloatingIP, id=id)
+        return tn_db.query_record(context, l3_db.FloatingIP, id=id)
 
 
     def create_floatingip(self, context, floatingip, returned_obj):
@@ -233,15 +233,15 @@ def network_migration(context, mech_driver):
         'id': '',
         'network_type': ''
     }
-    records = ngfw_db.query_records(context, models_v2.Network)
+    records = tn_db.query_records(context, models_v2.Network)
     with Progress(len(records), 'network_migration') as p:
         for record in records:
             reset(net)
             reset(segment)
-            db_seg = ngfw_db.query_record(context, ml2_db.NetworkSegment,
+            db_seg = tn_db.query_record(context, ml2_db.NetworkSegment,
                                               network_id=record.id)
             cls2dict(record, net)
-            db_extnet = ngfw_db.query_record(context, ExternalNetwork,
+            db_extnet = tn_db.query_record(context, ExternalNetwork,
                                               network_id=record.id)
             if db_extnet:
                 net['router:external'] = True
@@ -275,18 +275,18 @@ def subnet_migration(context, mech_driver):
         'start': '172.20.21.2',
         'end': '172.20.21.254'
     }
-    records = ngfw_db.query_records(context, models_v2.Subnet)
+    records = tn_db.query_records(context, models_v2.Subnet)
     with Progress(len(records), 'subnet_migration') as p:
         for record in records:
             dns_nameservers = []
             reset(subnet)
             reset(ipallocation_pool)
-            db_ipallocation = ngfw_db.query_record(context,
+            db_ipallocation = tn_db.query_record(context,
                                                 models_v2.IPAllocationPool,
                                                 subnet_id=record.id)
             cls2dict(db_ipallocation, ipallocation_pool,
                      first_ip='start', last_ip='end')
-            db_dnssrvs = ngfw_db.query_records(context,
+            db_dnssrvs = tn_db.query_records(context,
                                                    models_v2.DNSNameServer,
                                                    subnet_id=record.id)
 
@@ -352,7 +352,7 @@ def port_migration(context, mech_driver, l3_driver):
         'ip_address': u'172.20.21.1'
     }
     MAC = utils.get_mac(mech_driver, context)
-    records = ngfw_db.query_records(context, models_v2.Port)
+    records = tn_db.query_records(context, models_v2.Port)
     with Progress(len(records), 'port_migration') as p:
          for record in records:
             reset(port)
@@ -366,15 +366,15 @@ def port_migration(context, mech_driver, l3_driver):
             if port['device_owner'] in [ROUTER_INTF, ROUTER_GW] and \
                MAC not in port['mac_address']:
                 port['mac_address'] = MAC
-                if not ngfw_db.query_count(context, models_v2.Port,
+                if not tn_db.query_count(context, models_v2.Port,
                     mac_address=MAC, network_id=record.network_id):
-                    ngfw_db.update_record(context, record,
+                    tn_db.update_record(context, record,
                                               mac_address=MAC)
             mech_context = Fake_mech_context(_plugin_context=context,
                                              current=port)
             mech_driver.create_port_precommit(mech_context)
             mech_driver.create_port_postcommit(mech_context)
-            db_routerport = ngfw_db.query_record(context,
+            db_routerport = tn_db.query_record(context,
                                                      l3_db.RouterPort,
                                                      port_id=record.id)
             if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
@@ -403,7 +403,7 @@ def router_migration(context, l3_driver):
     }
     router = {'router': router_obj}
 
-    records = ngfw_db.query_records(context, l3_db.Router)
+    records = tn_db.query_records(context, l3_db.Router)
     with Progress(len(records), 'router_migration') as p:
         for record in records:
             reset(router_obj)
@@ -445,7 +445,7 @@ def floatingip_migration(context, l3_driver):
         'id': '78764016-da62-42fd-96a4-f2bd0510b5bc'
         }
     floatingip = {'floatingip': returned_obj}
-    records = ngfw_db.query_records(context, l3_db.FloatingIP)
+    records = tn_db.query_records(context, l3_db.FloatingIP)
     with Progress(len(records), 'floatingip_migration') as p:
         for record in records:
             reset(returned_obj)
