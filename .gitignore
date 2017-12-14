@@ -9,7 +9,7 @@ dist/
 doc/build
 *.DS_Store
 *.pyc
-networking_fortinet.egg-info/
+networking_tn.egg-info/
 pbr*.egg/
 run_tests.err.log
 run_tests.log

@@ -57,8 +57,8 @@ cfg.CONF.import_group('ml2_tn', 'networking_tn.common.config')
 
 from networking_tn.common import resources
 from networking_tn.common import utils
-from networking_tn.ml2 import mech_fortinet
-from networking_tn.services.l3_router import l3_fortinet
+from networking_tn.ml2 import mech_tn
+from networking_tn.services.l3_router import l3_tn
 from networking_tn.tasks import tasks
 from networking_tn.tasks import constants as t_consts
 from networking_tn.db import models as tn_db
@@ -107,7 +107,7 @@ class Fake_mech_context(object):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
 
-class Fake_FortinetL3ServicePlugin(l3_fortinet.FortinetL3ServicePlugin):
+class Fake_FortinetL3ServicePlugin(l3_tn.FortinetL3ServicePlugin):
     def __init__(self):
         self._fortigate = None
         self._driver = None
@@ -168,7 +168,7 @@ class Fake_FortinetL3ServicePlugin(l3_fortinet.FortinetL3ServicePlugin):
         return returned_obj
 
 def init_mech_driver():
-    mech_driver = mech_fortinet.FortinetMechanismDriver()
+    mech_driver = mech_tn.FortinetMechanismDriver()
     mech_driver.initialize()
     return mech_driver
 

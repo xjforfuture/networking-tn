@@ -22,9 +22,9 @@ from oslo_db import options as db_options
 
 from neutron.db import api as db_api
 
-from networking_fortinet.common import config
-from networking_fortinet.ml2 import mech_fortinet
-from networking_fortinet.tests.unit import (
+from networking_tn.common import config
+from networking_tn.ml2 import mech_tn
+from networking_tn.tests.unit import (
     test_fortinet_common as mocked)
 TEST_SEG1 = 'seg1'
 
@@ -35,7 +35,7 @@ class TestFortinetMechDriver(mocked.FortinetTestCase):
 
     def setUp(self):
         super(TestFortinetMechDriver, self).setUp()
-        self.driver = mech_fortinet.FortinetMechanismDriver()
+        self.driver = mech_tn.FortinetMechanismDriver()
         self.driver.sync_conf_to_db = mock.Mock()
         self.driver.sync_conf_to_db.return_value = 'ok'
         self.driver.Fortinet_init = mock.Mock()

@@ -1,3 +1,3 @@
-Fortinet ML2 Mechanism driver from ML2 plugin
+tn ML2 Mechanism driver from ML2 plugin
 ============================================
 
