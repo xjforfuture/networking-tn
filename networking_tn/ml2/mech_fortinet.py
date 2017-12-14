@@ -79,11 +79,12 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
     def Fortinet_init(self):
         """Fortinet specific initialization for this class."""
         LOG.debug("FortinetMechanismDriver_init")
-        self._fortigate = config.fgt_info
+        self._fortigate = config.tn_info
         self._driver = config.get_apiclient()
 
-        for key in const.FORTINET_PARAMS:
-            self.sync_conf_to_db(key)
+        ''' to do xiongjun'''
+        #for key in const.FORTINET_PARAMS:
+        #    self.sync_conf_to_db(key)
 
         session = db_api.get_session()
         try:

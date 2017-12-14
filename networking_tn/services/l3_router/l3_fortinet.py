@@ -69,7 +69,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
     def Fortinet_init(self):
         """Fortinet specific initialization for this class."""
         LOG.debug("FortinetL3ServicePlugin_init")
-        self._fortigate = config.fgt_info
+        self._fortigate = config.tn_info
         self._driver = config.get_apiclient()
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
 

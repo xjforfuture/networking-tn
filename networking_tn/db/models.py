@@ -200,6 +200,7 @@ class DBbase(object):
 
 class Fortinet_ML2_Namespace(model_base.BASEV2, DBbase):
     """Schema for Fortinet network."""
+    #__tablename__ = 'Fortinet_ML2_Namespace'
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     tenant_id = sa.Column(sa.String(36), primary_key=True)
     # For the name of vdom has the following restrictions:

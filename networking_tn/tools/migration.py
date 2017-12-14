@@ -22,6 +22,7 @@ from neutron import version
 from neutron.common import constants as l3_constants
 
 from neutron.db import models_v2, l3_db
+from neutron.db.models import l3 as l3_models
 
 #from neutron.db.external_net_db import ExternalNetwork
 from neutron.objects.network import ExternalNetwork
@@ -29,7 +30,7 @@ from neutron.objects.network import ExternalNetwork
 from oslo_db.sqlalchemy import session
 import neutron.plugins.ml2.models as ml2_db
 
-
+sys.path.append(r'/home/xiongjun/work/networking-tn/')
 
 ROUTER_INTF = l3_db.DEVICE_OWNER_ROUTER_INTF
 ROUTER_GW = l3_db.DEVICE_OWNER_ROUTER_GW
@@ -37,6 +38,7 @@ ROUTER_GW = l3_db.DEVICE_OWNER_ROUTER_GW
 #streamlog = handlers.ColorHandler()
 LOG = logging.getLogger(None).logger
 #LOG.addHandler(streamlog)
+LOG.setLevel(logging.DEBUG)
 
 CFG_ARGS = [
              '--config-file',
@@ -146,7 +148,7 @@ class Fake_FortinetL3ServicePlugin(l3_fortinet.FortinetL3ServicePlugin):
                            nat='enable')
 
     def _get_floatingip(self, context, id):
-        return tn_db.query_record(context, l3_db.FloatingIP, id=id)
+        return tn_db.query_record(context, l3_models.FloatingIP, id=id)
 
 
     def create_floatingip(self, context, floatingip, returned_obj):
@@ -374,7 +376,7 @@ def port_migration(context, mech_driver, l3_driver):
             mech_driver.create_port_precommit(mech_context)
             mech_driver.create_port_postcommit(mech_context)
             db_routerport = tn_db.query_record(context,
-                                                     l3_db.RouterPort,
+                                                     l3_models.RouterPort,
                                                      port_id=record.id)
             if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
                 l3_driver.add_router_interface(context, port)
@@ -402,7 +404,7 @@ def router_migration(context, l3_driver):
     }
     router = {'router': router_obj}
 
-    records = tn_db.query_records(context, l3_db.Router)
+    records = tn_db.query_records(context, l3_models.Router)
     with Progress(len(records), 'router_migration') as p:
         for record in records:
             reset(router_obj)
@@ -444,7 +446,7 @@ def floatingip_migration(context, l3_driver):
         'id': '78764016-da62-42fd-96a4-f2bd0510b5bc'
         }
     floatingip = {'floatingip': returned_obj}
-    records = tn_db.query_records(context, l3_db.FloatingIP)
+    records = tn_db.query_records(context, l3_models.FloatingIP)
     with Progress(len(records), 'floatingip_migration') as p:
         for record in records:
             reset(returned_obj)
@@ -455,14 +457,23 @@ def floatingip_migration(context, l3_driver):
 
 def main():
     try:
+        print("step0")
         context = Fake_context()
+        print("step1")
         mech_driver = init_mech_driver()
+        print("step2")
         l3_driver = Fake_FortinetL3ServicePlugin()
+        print("step3")
         router_migration(context, l3_driver)
+        print("step4")
         network_migration(context, mech_driver)
+        print("step5")
         subnet_migration(context, mech_driver)
+        print("step6")
         port_migration(context, mech_driver, l3_driver)
+        print("step7")
         floatingip_migration(context, l3_driver)
+        print("step8")
     except Exception as e:
         raise(e)
     print "\nmigration completed.\n"
