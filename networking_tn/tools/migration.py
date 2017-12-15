@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet Inc.
+# Copyright 2017 tsinghuanet Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -457,6 +457,7 @@ def floatingip_migration(context, l3_driver):
 
 def main():
     try:
+
         print("step0")
         context = Fake_context()
         print("step1")
@@ -474,6 +475,7 @@ def main():
         print("step7")
         floatingip_migration(context, l3_driver)
         print("step8")
+
     except Exception as e:
         raise(e)
     print "\nmigration completed.\n"

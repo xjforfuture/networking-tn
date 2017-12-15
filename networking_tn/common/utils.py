@@ -319,6 +319,8 @@ def add_vdom(obj, context, **kwargs):
         op(obj, context, resources.Vdom.get, name=namespace.vdom)
     except exception.ResourceNotFound:
         op(obj, context, resources.Vdom.add, name=namespace.vdom)
+
+
     return namespace
 
 

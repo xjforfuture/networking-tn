@@ -18,6 +18,8 @@ from oslo_config import cfg
 from networking_tn._i18n import _
 
 ML2_TN = [
+    cfg.StrOpt('vm_image_name', default='tnos.qcow2',
+               help=_('TNOS image name')),
     cfg.StrOpt('address', default='',
                help=_('The address of fortigates to connect to')),
     cfg.StrOpt('port', default='443',
@@ -68,6 +70,7 @@ ML2_TN = [
 cfg.CONF.register_opts(ML2_TN, "ml2_tn")
 
 tn_info = {
+    'image' : cfg.CONF.ml2_tn.vm_image_name,
     'address': cfg.CONF.ml2_tn.address,
     'port': cfg.CONF.ml2_tn.port,
     'protocol': cfg.CONF.ml2_tn.protocol,

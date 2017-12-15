@@ -82,9 +82,8 @@ class FortinetMechanismDriver(driver_api.MechanismDriver):
         self._fortigate = config.tn_info
         self._driver = config.get_apiclient()
 
-        ''' to do xiongjun'''
-        #for key in const.FORTINET_PARAMS:
-        #    self.sync_conf_to_db(key)
+        for key in const.FORTINET_PARAMS:
+            self.sync_conf_to_db(key)
 
         session = db_api.get_session()
         try:

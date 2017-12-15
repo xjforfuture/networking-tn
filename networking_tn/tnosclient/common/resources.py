@@ -20,8 +20,8 @@ import six
 import sys
 import types
 
-from fortiosclient.common import constants as const
-from fortiosclient import exception as api_ex
+from networking_tn.tnosclient.common import constants as const
+from networking_tn.tnosclient import exception as api_ex
 
 
 LOG = logging.getLogger(__name__)
