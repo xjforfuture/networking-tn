@@ -52,23 +52,23 @@ DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 LOG = logging.getLogger(__name__)
 
 
-class FortinetL3ServicePlugin(router.L3RouterPlugin):
+class TNL3ServicePlugin(router.L3RouterPlugin):
     """Fortinet L3 service Plugin."""
 
     supported_extension_aliases = ["router", "ext-gw-mode", "extraroute"]
 
     def __init__(self):
         """Initialize Fortinet L3 service Plugin."""
-        super(FortinetL3ServicePlugin, self).__init__()
+        super(TNL3ServicePlugin, self).__init__()
         self._fortigate = None
         self._driver = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
-        self.Fortinet_init()
+        self.tn_init()
 
-    def Fortinet_init(self):
+    def tn_init(self):
         """Fortinet specific initialization for this class."""
-        LOG.debug("FortinetL3ServicePlugin_init")
+        LOG.debug("TNL3ServicePlugin_init")
         self._fortigate = config.tn_info
         self._driver = config.get_apiclient()
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
@@ -81,7 +81,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
         tenant_id = router['router']['tenant_id']
         if tn_db.query_count(context, l3_db.Router,
                                    tenant_id=tenant_id):
-            raise Exception(_("FortinetL3ServicePlugin:create_router "
+            raise Exception(_("TNL3ServicePlugin:create_router "
                               "Only support one router per tenant"))
         with context.session.begin(subtransactions=True):
             try:
@@ -93,13 +93,13 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
                               {"router": router})
                     utils._rollback_on_err(self, context, e)
         utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
-        return super(FortinetL3ServicePlugin, self).\
+        return super(TNL3ServicePlugin, self).\
             create_router(context, router)
 
     def update_router(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
                   {'id': id, 'router': router})
-        return (super(FortinetL3ServicePlugin, self).
+        return (super(TNL3ServicePlugin, self).
                 update_router(context, id, router))
 
     def delete_router(self, context, id):
@@ -112,7 +112,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
                 router = tn_db.query_record(context, l3_db.Router, id=id)
                 # TODO(jerryz): move this out of transaction.
                 setattr(context, 'GUARD_TRANSACTION', False)
-                super(FortinetL3ServicePlugin, self).delete_router(context, id)
+                super(TNL3ServicePlugin, self).delete_router(context, id)
                 if getattr(router, 'tenant_id', None):
                     utils.delete_vlink(self, context, router.tenant_id)
                     utils.delete_vdom(self, context,
@@ -125,17 +125,17 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
 
     def add_router_interface(self, context, router_id, interface_info):
         """creates vlnk on the fortinet device."""
-        LOG.debug("FortinetL3ServicePlugin.add_router_interface: "
+        LOG.debug("TNL3ServicePlugin.add_router_interface: "
                   "router_id=%(router_id)s "
                   "interface_info=%(interface_info)r",
                   {'router_id': router_id, 'interface_info': interface_info})
         with context.session.begin(subtransactions=True):
-            info = super(FortinetL3ServicePlugin, self).add_router_interface(
+            info = super(TNL3ServicePlugin, self).add_router_interface(
                 context, router_id, interface_info)
             port = db.get_port(context, info['port_id'])
             port['admin_state_up'] = True
             port['port'] = port
-            LOG.debug("FortinetL3ServicePlugin: "
+            LOG.debug("TNL3ServicePlugin: "
                       "context=%(context)s"
                       "port=%(port)s "
                       "info=%(info)r",
@@ -153,9 +153,9 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
             # added to db
             if port_count == 2:
                 # This subnet is already part of some router
-                LOG.error(_LE("FortinetL3ServicePlugin: adding redundant "
+                LOG.error(_LE("TNL3ServicePlugin: adding redundant "
                               "router interface is not supported"))
-                raise Exception(_("FortinetL3ServicePlugin:adding redundant "
+                raise Exception(_("TNL3ServicePlugin:adding redundant "
                                   "router interface is not supported"))
             try:
                 db_namespace = tn_db.query_record(context,
@@ -184,14 +184,14 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
 
     def remove_router_interface(self, context, router_id, interface_info):
         """Deletes vlink, default router from Fortinet device."""
-        LOG.debug("FortinetL3ServicePlugin.remove_router_interface called: "
+        LOG.debug("TNL3ServicePlugin.remove_router_interface called: "
                   "router_id=%(router_id)s "
                   "interface_info=%(interface_info)r",
                   {'router_id': router_id, 'interface_info': interface_info})
         with context.session.begin(subtransactions=True):
             # TODO(jerryz): move this out of transaction.
             setattr(context, 'GUARD_TRANSACTION', False)
-            info = (super(FortinetL3ServicePlugin, self).
+            info = (super(TNL3ServicePlugin, self).
                     remove_router_interface(context, router_id,
                                             interface_info))
             try:
@@ -226,7 +226,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
         IP object will be DOWN.
         """
         LOG.debug("create_floatingip: floatingip=%s", floatingip)
-        returned_obj = (super(FortinetL3ServicePlugin, self).
+        returned_obj = (super(TNL3ServicePlugin, self).
                         create_floatingip(context, floatingip))
         try:
             self._allocate_floatingip(context, returned_obj)
@@ -243,7 +243,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 resources.Exinfo(e)
-                super(FortinetL3ServicePlugin, self).delete_floatingip(
+                super(TNL3ServicePlugin, self).delete_floatingip(
                     context, returned_obj['id'])
 
     def delete_floatingip(self, context, id):
@@ -251,7 +251,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
         fip = tn_db.query_record(context, l3_db.FloatingIP, id=id)
         if fip and getattr(fip, 'fixed_port_id', None):
             self._disassociate_floatingip(context, id)
-            super(FortinetL3ServicePlugin, self).disassociate_floatingips(
+            super(TNL3ServicePlugin, self).disassociate_floatingips(
                 context, fip['fixed_port_id'])
         self._release_floatingip(context, id)
 
@@ -265,7 +265,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
         if floatingip['floatingip']['port_id']:
             # floating ip associate with VM port.
             try:
-                res = (super(FortinetL3ServicePlugin, self).
+                res = (super(TNL3ServicePlugin, self).
                        update_floatingip(context, id, floatingip))
                 if not floatingip['floatingip'].get('fixed_ip_address', None):
                     floatingip['floatingip']['fixed_ip_address'] = (res.
@@ -276,13 +276,13 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
             except Exception as e:
                 with excutils.save_and_reraise_exception():
                     resources.Exinfo(e)
-                    super(FortinetL3ServicePlugin,
+                    super(TNL3ServicePlugin,
                           self).disassociate_floatingips(
                         context, floatingip['floatingip']['port_id'])
         else:
             # disassociate floating ip.
             self._disassociate_floatingip(context, id)
-            res = (super(FortinetL3ServicePlugin, self).
+            res = (super(TNL3ServicePlugin, self).
                    update_floatingip(context, id, floatingip))
             self.update_floatingip_status(context, res,
                             l3_constants.FLOATINGIP_STATUS_DOWN, id=id)
@@ -391,7 +391,7 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
                                        fixed_port_id=port_id)
         if fip and getattr(fip, 'id', None):
             self._disassociate_floatingip(context, fip.id)
-        return super(FortinetL3ServicePlugin,
+        return super(TNL3ServicePlugin,
                      self).disassociate_floatingips(context,
                                                     port_id,
                                                     do_notify=do_notify)
@@ -600,6 +600,6 @@ class FortinetL3ServicePlugin(router.L3RouterPlugin):
                             vip_name=db_fip.floating_ip_address)
             # TODO(jerryz): move this out of transaction.
             setattr(context, 'GUARD_TRANSACTION', False)
-            super(FortinetL3ServicePlugin, self).delete_floatingip(context, id)
+            super(TNL3ServicePlugin, self).delete_floatingip(context, id)
             utils.delete_vlink(self, context, tenant_id)
             utils.delete_vdom(self, context, tenant_id=tenant_id)

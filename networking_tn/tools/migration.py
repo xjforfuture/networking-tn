@@ -107,13 +107,13 @@ class Fake_mech_context(object):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
 
-class Fake_FortinetL3ServicePlugin(l3_tn.FortinetL3ServicePlugin):
+class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def __init__(self):
         self._fortigate = None
         self._driver = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
-        self.Fortinet_init()
+        self.tn_init()
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -461,12 +461,14 @@ def main():
         print("step0")
         context = Fake_context()
         print("step1")
-        mech_driver = init_mech_driver()
+        #mech_driver = init_mech_driver()
         print("step2")
-        l3_driver = Fake_FortinetL3ServicePlugin()
+        l3_driver = Fake_TNL3ServicePlugin()
         print("step3")
         router_migration(context, l3_driver)
         print("step4")
+
+        '''
         network_migration(context, mech_driver)
         print("step5")
         subnet_migration(context, mech_driver)
@@ -475,6 +477,7 @@ def main():
         print("step7")
         floatingip_migration(context, l3_driver)
         print("step8")
+        '''
 
     except Exception as e:
         raise(e)

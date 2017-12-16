@@ -24,7 +24,8 @@ from oslo_log import log as logging
 LOG = logging.getLogger(__name__)
 
 class TNOSvm():
-    libvirt_cmd = '''kvm -nographic -device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing -device e1000,netdev=eth1 -netdev tap,id=eth1,script=nothing '''
+    libvirt_cmd = 'kvm -nographic -device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing ' \
+                    + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=nothing '
     image = 'tnos'
     image_id = 0
     def __init__(self, vmname, source_image):
@@ -38,10 +39,9 @@ class TNOSvm():
         self.image_name = self.image_name + '.' + image_path[-1].split('.')[-1]
         image_path[-1] = self.image_name
         image_path = '/'.join(image_path)
-        print(image_path)
 
         self.image_name = image_path
-        copyfile(source_image, str(image_path))
+        copyfile(source_image, image_path)
 
         LOG.debug("%s init" % self.vmname)
 
@@ -127,7 +127,7 @@ class TNOSvm():
 
 
 def main():
-    tnos = TNOSvm('tnos1', '/home/xiongjun/work/tnos_d65a731d65a731.qcow2')
+    tnos = TNOSvm('tnos1', '/home/xiongjun/work/tnos.qcow2')
     state = tnos.start()
     if not state:
         print("TNOS is not running")
