@@ -1038,3 +1038,11 @@ def vm_diskstats(vm_=None):
         for vm_ in list_active_vms():
             info[vm_] = _info(vm_)
     return info
+
+def main():
+    tnos = create_xml_path('/home/xiongjun/work/ovf/tnos-vm.ovf')
+    print(tnos.name())
+
+
+if __name__ == "__main__":
+    main()
