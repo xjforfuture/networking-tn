@@ -109,7 +109,7 @@ class Fake_mech_context(object):
 
 class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def __init__(self):
-        self._fortigate = None
+        self._tn_info = None
         self._driver = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
@@ -120,11 +120,13 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         # Limit one router per tenant
         if not router.get('router', None):
             return
-        tenant_id = router['router']['tenant_id']
+        tenant_id = router['router']['id']
         with context.session.begin(subtransactions=True):
             try:
-                namespace = utils.add_vdom(self, context, tenant_id=tenant_id)
-                utils.add_vlink(self, context, namespace.vdom)
+                namespace, vm = utils.add_vdom(self, context, tenant_id=tenant_id)
+                self._neutron_device_id = namespace.tenant_id
+                self._vm = vm
+                #utils.add_vlink(self, context, namespace.vdom)
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
                           {"router": router})
@@ -133,19 +135,24 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
 
 
-    def add_router_interface(self, context, port):
+    def add_router_interface(self, context, port, is_gw):
         """creates vlnk on the fortinet device."""
         db_namespace = tn_db.query_record(context,
                                 tn_db.Fortinet_ML2_Namespace,
-                                tenant_id=port['tenant_id'])
-        vlan_inf = utils.get_intf(context, port['network_id'])
-        int_intf, ext_intf = utils.get_vlink_intf(self, context,
-                                       vdom=db_namespace.vdom)
+                                tenant_id=port['device_id'])
+
+        if is_gw:
+            ip = port['fixed_ips'][0]['ip_address']
+            self._vm.set_mange_ip(ip, '255.255.255.0')
+            self.intf[0]['intf_id'] = 
+
+        '''
         utils.add_fwpolicy(self, context,
                            vdom=db_namespace.vdom,
                            srcintf=vlan_inf,
                            dstintf=int_intf,
                            nat='enable')
+        '''
 
     def _get_floatingip(self, context, id):
         return tn_db.query_record(context, l3_models.FloatingIP, id=id)
@@ -301,7 +308,7 @@ def subnet_migration(context, mech_driver):
             mech_driver.create_subnet_postcommit(mech_context)
             p.update()
 
-def port_migration(context, mech_driver, l3_driver):
+def port_migration(context, mech_driver=None, l3_driver=None):
     """
     :param mech_driver:
     :param context:
@@ -352,8 +359,9 @@ def port_migration(context, mech_driver, l3_driver):
         'subnet_id': u'f645b09c-a34a-42fb-9c14-b999e43a54c7',
         'ip_address': u'172.20.21.1'
     }
-    MAC = utils.get_mac(mech_driver, context)
+    #MAC = utils.get_mac(mech_driver, context)
     records = tn_db.query_records(context, models_v2.Port)
+
     with Progress(len(records), 'port_migration') as p:
          for record in records:
             reset(port)
@@ -375,12 +383,94 @@ def port_migration(context, mech_driver, l3_driver):
                                              current=port)
             mech_driver.create_port_precommit(mech_context)
             mech_driver.create_port_postcommit(mech_context)
+
+
             db_routerport = tn_db.query_record(context,
                                                      l3_models.RouterPort,
                                                      port_id=record.id)
             if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
                 l3_driver.add_router_interface(context, port)
             p.update()
+
+
+def port_migration_new(context, l3_driver):
+    """
+    :param mech_driver:
+    :param context:
+    :return:
+    # table ports
+    port
+    {
+        'status': 'DOWN',
+        'binding: host_id': '',
+        'allowed_address_pairs': [],
+        'device_owner': 'network: router_interface',
+        'binding: profile': {
+
+        },
+        # table ipallocations
+        'fixed_ips': [{
+            'subnet_id': u'f645b09c-a34a-42fb-9c14-b999e43a54c7',
+            'ip_address': u'172.20.21.1'
+        }],
+        'id': 'fb66def6-bd5e-44a0-a3f7-7c0e8e08d9ff',
+        'security_groups': [],
+        'device_id': u'e4020c65-7003-468b-a34d-31af297397a0',
+        'name': '',
+        'admin_state_up': True,
+        'network_id': u'f8e34426-ccf7-429c-b726-3809d54cabdc',
+        'tenant_id': u'11513667f4ee4a14acb0985659456f24',
+        'binding: vif_details': {
+        },
+        'binding: vnic_type': 'normal',
+        'binding: vif_type': 'unbound',
+        'mac_address': u'00: 0c: 29: d9: 18: 3f'
+    }
+    """
+    port = {
+        'device_owner': 'network: router_interface',
+        'fixed_ips': [{
+            'subnet_id': u'f645b09c-a34a-42fb-9c14-b999e43a54c7',
+            'ip_address': u'172.20.21.1'
+        }],
+        'id': 'fb66def6-bd5e-44a0-a3f7-7c0e8e08d9ff',
+        'device_id': u'e4020c65-7003-468b-a34d-31af297397a0',
+        'admin_state_up': True,
+        'network_id': u'f8e34426-ccf7-429c-b726-3809d54cabdc',
+        'tenant_id': u'11513667f4ee4a14acb0985659456f24',
+        'mac_address': u'00: 0c: 29: d9: 18: 3f'
+    }
+    ipallocation = {
+        'subnet_id': u'f645b09c-a34a-42fb-9c14-b999e43a54c7',
+        'ip_address': u'172.20.21.1'
+    }
+
+    records = tn_db.query_records(context, models_v2.Port)
+
+    with Progress(len(records), 'port_migration') as p:
+         for record in records:
+            reset(port)
+            cls2dict(record, port)
+
+            print(port)
+
+            '''
+            if not port['fixed_ips']:
+                fixed_ips = []
+                for fixed_ip in port['fixed_ips']:
+                    cls2dict(fixed_ip, ipallocation)
+                    fixed_ips.append(ipallocation)
+                port['fixed_ips'] = fixed_ips
+            '''
+
+            db_routerport = tn_db.query_record(context, l3_models.RouterPort, port_id=record.id)
+
+            if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
+                l3_driver.add_router_interface(context, port, False)
+            else:
+                l3_driver.add_router_interface(context, port, True)
+            p.update()
+
 
 
 def router_migration(context, l3_driver):
@@ -400,11 +490,13 @@ def router_migration(context, l3_driver):
     router_obj = {
         'name': 'adm_router',
         'admin_state_up': True,
-        'tenant_id': u'01c2468ab38b4d4490a39765bb87cb00'
+        'id': u'01c2468ab38b4d4490a39765bb87cb00'
     }
     router = {'router': router_obj}
 
     records = tn_db.query_records(context, l3_models.Router)
+
+    print(records)
     with Progress(len(records), 'router_migration') as p:
         for record in records:
             reset(router_obj)
@@ -468,12 +560,15 @@ def main():
         router_migration(context, l3_driver)
         print("step4")
 
-        '''
-        network_migration(context, mech_driver)
+
+        #network_migration(context, mech_driver)
         print("step5")
-        subnet_migration(context, mech_driver)
+        #subnet_migration(context, mech_driver)
         print("step6")
-        port_migration(context, mech_driver, l3_driver)
+
+
+        port_migration_new(context, l3_driver)
+        '''
         print("step7")
         floatingip_migration(context, l3_driver)
         print("step8")

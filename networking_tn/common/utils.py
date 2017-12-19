@@ -25,6 +25,7 @@ from networking_tn.common import constants as const
 from networking_tn.common import resources as resources
 from networking_tn.db import models as fortinet_db
 from networking_tn.tasks import constants as t_consts
+from networking_tn.tnosclient import tnos_driver as tn_drv
 
 LOG = logging.getLogger(__name__)
 
@@ -315,13 +316,31 @@ def delete_by_id(obj, context, cls, resource, **kwargs):
 def add_vdom(obj, context, **kwargs):
     namespace = add_record(obj, context, fortinet_db.Fortinet_ML2_Namespace,
                            **kwargs)
+
+    print('debug namespace %s ' % (namespace))
+    '''
     try:
         op(obj, context, resources.Vdom.get, name=namespace.vdom)
     except exception.ResourceNotFound:
         op(obj, context, resources.Vdom.add, name=namespace.vdom)
+    '''
+    tnos = tn_drv.TNOSvm.get(vmname=namespace.vdom)
+    if not tnos:
+        tnos = tn_drv.TNOSvm(namespace.vdom, obj._tn_info['image_patch'])
+        tnos.start()
 
+    elif tnos.state is 'shutdown':
+        tnos.start()
+    elif tnos.state is 'crashed':
+        tnos.stop()
+        tnos.start()
 
-    return namespace
+    tnos.enable_http()
+    tnos.enable_https()
+    tnos.enable_ping()
+    tnos.enable_telnet()
+
+    return (namespace, tnos)
 
 
 def delete_vdom(obj, context, **kwargs):
@@ -793,6 +812,8 @@ def add_vlink(obj, context, vdom):
                         fortinet_db.Fortinet_Vlink_IP_Allocation,
                         vdom=vdom,
                         vlink_id=vlink_vlan.id)
+
+    print('add vlink %s %s' % (vlink_vlan, vlink_ip))
     if vlink_ip:
         add_vlink_intf(obj, context, vlink_vlan, vlink_ip)
         gateway_ip = get_ipaddr(netaddr.IPNetwork(vlink_ip.vlink_ip_subnet), 1)

@@ -92,7 +92,7 @@ def upgrade():
         sa.Column('id', mysql.INTEGER(display_width=11), nullable=False,
                   autoincrement=True),
         sa.Column('tenant_id', mysql.VARCHAR(length=36), nullable=False),
-        sa.Column('vdom', mysql.VARCHAR(length=11), nullable=True),
+        sa.Column('router', mysql.VARCHAR(length=11), nullable=True),
         sa.PrimaryKeyConstraint('id', 'tenant_id')
     )
     op.create_table('fortinet_vdom_vlinks',

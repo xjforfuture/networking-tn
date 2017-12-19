@@ -23,11 +23,17 @@ from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 
+VIRT_STATE_MAP = ['running',
+                  'shutdown',
+                  'crashed']
+
 class TNOSvm():
     libvirt_cmd = 'kvm -nographic -device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing ' \
                     + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=nothing '
     image = 'tnos'
     image_id = 0
+    tnosvm = []
+
     def __init__(self, vmname, source_image):
         self.manage_ip = None
         self.subprocess = None
@@ -43,7 +49,16 @@ class TNOSvm():
         self.image_name = image_path
         copyfile(source_image, image_path)
 
+        TNOSvm.tnosvm.append(self)
+
         LOG.debug("%s init" % self.vmname)
+
+    @staticmethod
+    def get(vmname):
+        for vm in TNOSvm.tnosvm:
+            if vm.vmname == vmname:
+                return vm
+        return None
 
 
     def start(self):
@@ -59,13 +74,17 @@ class TNOSvm():
                 break
 
         if i+1 == 1024:
+            self.state = VIRT_STATE_MAP[2]
             return False
         else:
+            self.state = VIRT_STATE_MAP[0]
             return True
+
 
     def stop(self):
         try:
             os.kill(self.subprocess.pid+1, signal.SIGKILL)
+            self.state = VIRT_STATE_MAP[1]
             LOG.info("%s stop" % self.vmname)
         except OSError, e:
             LOG.info("%s stop error" % self.vmname)
@@ -75,11 +94,12 @@ class TNOSvm():
         os.remove(self.image_name)
         LOG.info("Destroy %s" % self.vmname)
 
+        for vm in TNOSvm.tnosvm:
+            if vm is self:
+                TNOSvm.tnosvm.pop(vm)
+
     def is_running(self):
-        try:
-            self.subprocess.stdin.write('\n')
-        except Exception:
-            return False
+        return self.state
 
     def login(self, username='admin', passward='admin'):
         self.subprocess.stdin.write(username+'\n')

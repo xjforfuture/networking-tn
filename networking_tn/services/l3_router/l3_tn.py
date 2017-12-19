@@ -51,6 +51,17 @@ DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 
 LOG = logging.getLogger(__name__)
 
+ROUTER_MAX_INTF = 3
+
+DEFAULT_INTF_INFO = {'intf_id':None,
+                     'status':None,
+                     'extern_name':'tap',
+                     'inner_name':'ethernet',
+                     'mac':None,
+                     'ip': None,
+                     'mask':None
+                     }
+
 
 class TNL3ServicePlugin(router.L3RouterPlugin):
     """Fortinet L3 service Plugin."""
@@ -60,16 +71,24 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
     def __init__(self):
         """Initialize Fortinet L3 service Plugin."""
         super(TNL3ServicePlugin, self).__init__()
-        self._fortigate = None
+        self._tn_info = None
         self._driver = None
+        self._vm = None
+        self._neutron_device_id = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
+        self.intf = []
+        for i in range(ROUTER_MAX_INTF):
+            intf = DEFAULT_INTF_INFO.copy()
+            intf['extern_name'] = intf['extern_name'] + str(i)
+            intf['inner_name'] = intf['inner_name'] + str(i)
+            self.intf.append(intf)
 
     def tn_init(self):
         """Fortinet specific initialization for this class."""
         LOG.debug("TNL3ServicePlugin_init")
-        self._fortigate = config.tn_info
+        self._tn_info = config.tn_info
         self._driver = config.get_apiclient()
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
 
