@@ -27,9 +27,13 @@ VIRT_STATE_MAP = ['running',
                   'shutdown',
                   'crashed']
 
+MANAGE_INTF_ID = 0
+
 class TNOSvm():
-    libvirt_cmd = 'kvm -nographic -device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing ' \
-                    + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=nothing '
+    kvm_cmd = 'kvm -nographic ' \
+                  + '-device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing ' \
+                  + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=nothing ' \
+                  + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=nothing '
     image = 'tnos'
     image_id = 0
     tnosvm = []
@@ -48,6 +52,7 @@ class TNOSvm():
 
         self.image_name = image_path
         copyfile(source_image, image_path)
+        LOG.debug("copy file :%s to %s" % (source_image, self.image_name))
 
         TNOSvm.tnosvm.append(self)
 
@@ -63,8 +68,8 @@ class TNOSvm():
 
     def start(self):
         '''create tnos vm'''
-        LOG.info("%s start" % self.vmname)
-        cmd = TNOSvm.libvirt_cmd + self.image_name
+        LOG.info("%s start" % self.image_name)
+        cmd = TNOSvm.kvm_cmd + self.image_name
         self.subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
         time.sleep(15)
@@ -105,38 +110,41 @@ class TNOSvm():
         self.subprocess.stdin.write(username+'\n')
         self.subprocess.stdin.write(passward+'\n')
 
-    def into_manage_interface(self):
+    def into_interface(self, intf_id):
+        self.login()
         self.subprocess.stdin.write('end\n')
         self.subprocess.stdin.write('enable\n')
         self.subprocess.stdin.write('config\n')
-        self.subprocess.stdin.write('interface ethernet0\n')
+        self.subprocess.stdin.write('interface ethernet'+ str(intf_id) + '\n')
 
-    def set_mange_ip(self, ip, mask):
-        self.into_manage_interface()
+    def config_intf_ip(self, intf_id, ip, mask):
+        self.into_interface(intf_id)
 
+        self.subprocess.stdin.write('zone trust \n')
         cmd = 'ip address '+ ip + ' ' + mask +'\n'
         self.subprocess.stdin.write(cmd)
 
     def enable_ping(self):
-        self.into_manage_interface()
+        self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage ping\n')
 
     def enable_http(self):
-        self.into_manage_interface()
+        self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage http\n')
 
     def enable_https(self):
-        self.into_manage_interface()
+        self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage https\n')
 
     def enable_telnet(self):
-        self.into_manage_interface()
+        self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage telnet\n')
 
     def display_config(self, line_num=1024):
         flag = False
         self.subprocess.stdin.write('show running-config\n')
-        while True:
+        while line_num:
+            line_num = line_num - 1
             message = self.subprocess.stdout.readline()
             if 'show running-config' in message:
                 flag = True
@@ -153,10 +161,10 @@ def main():
         print("TNOS is not running")
 
     tnos.login()
-    tnos.set_mange_ip('20.1.1.3', '255.255.255.0')
+    tnos.config_intf_ip(MANAGE_INTF_ID, '20.1.1.3', '255.255.255.0')
     tnos.display_config()
 
-    tnos.destroy()
+    #tnos.destroy()
 
 if __name__ == "__main__":
     main()

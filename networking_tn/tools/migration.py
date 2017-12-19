@@ -62,6 +62,7 @@ from networking_tn.services.l3_router import l3_tn
 from networking_tn.tasks import tasks
 from networking_tn.tasks import constants as t_consts
 from networking_tn.db import models as tn_db
+from networking_tn.tnosclient import tnos_driver as tn_drv
 
 class Progress(object):
     def __init__(self, total, name=''):
@@ -111,6 +112,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def __init__(self):
         self._tn_info = None
         self._driver = None
+        self._vm = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
@@ -141,10 +143,33 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
                                 tn_db.Fortinet_ML2_Namespace,
                                 tenant_id=port['device_id'])
 
+        ip = port['fixed_ips'][0]['ip_address']
+        mask = '255.255.255.0'
+        intf_id = -1
+
         if is_gw:
-            ip = port['fixed_ips'][0]['ip_address']
-            self._vm.set_mange_ip(ip, '255.255.255.0')
-            self.intf[0]['intf_id'] = 
+            intf_id = tn_drv.MANAGE_INTF_ID
+            self.intf[intf_id].is_gw = True
+        else:
+            for intf in self.intf:
+                if intf.status:
+                    continue
+                else:
+                    intf_id = self.intf.index(intf)
+                    if intf_id == tn_drv.MANAGE_INTF_ID:
+                        intf_id = -1
+                    else:
+                        break
+
+        if intf_id >= 0:
+            self.intf[intf_id].neutron_intf_id = port['id']
+            self.intf[intf_id].ip = ip
+            self.intf[intf_id].mask = mask
+            self.intf[intf_id].status = True
+            self._vm.config_intf_ip(intf_id, ip, mask)
+        else:
+            LOG.error('add router interface fail!')
+
 
         '''
         utils.add_fwpolicy(self, context,
@@ -465,10 +490,12 @@ def port_migration_new(context, l3_driver):
 
             db_routerport = tn_db.query_record(context, l3_models.RouterPort, port_id=record.id)
 
-            if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
-                l3_driver.add_router_interface(context, port, False)
-            else:
-                l3_driver.add_router_interface(context, port, True)
+            if l3_driver._neutron_device_id == record.device_id:
+                if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
+                    l3_driver.add_router_interface(context, port, False)
+                elif getattr(db_routerport, 'port_type', None) in [ROUTER_GW]:
+                    l3_driver.add_router_interface(context, port, True)
+
             p.update()
 
 
