@@ -128,6 +128,10 @@ class TNOSvm():
         self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage ping\n')
 
+        self.into_interface(1)
+        self.subprocess.stdin.write('zone trust \n')
+        self.subprocess.stdin.write('manage ping\n')
+
     def enable_http(self):
         self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage http\n')
@@ -141,7 +145,7 @@ class TNOSvm():
         self.subprocess.stdin.write('manage telnet\n')
 
     def display_config(self, line_num=1024):
-        flag = False
+        flag = True
         self.subprocess.stdin.write('show running-config\n')
         while line_num:
             line_num = line_num - 1
@@ -150,7 +154,7 @@ class TNOSvm():
                 flag = True
             if flag:
                 print message
-                if 'end' in message:
+                if '!' in message:
                     break
 
 

@@ -16,7 +16,7 @@
 
 
 """Implentation of FortiOS service Plugin."""
-
+import subprocess
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import excutils
@@ -48,6 +48,7 @@ DEVICE_OWNER_ROUTER_INTF = l3_constants.DEVICE_OWNER_ROUTER_INTF
 DEVICE_OWNER_ROUTER_GW = l3_constants.DEVICE_OWNER_ROUTER_GW
 DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 
+INT_BRIDGE_NAME = 'br-int'
 
 LOG = logging.getLogger(__name__)
 

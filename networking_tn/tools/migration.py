@@ -14,6 +14,7 @@
 
 import time
 import sys
+import subprocess
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -63,6 +64,7 @@ from networking_tn.tasks import tasks
 from networking_tn.tasks import constants as t_consts
 from networking_tn.db import models as tn_db
 from networking_tn.tnosclient import tnos_driver as tn_drv
+from networking_tn.ovsctl import ovsctl
 
 class Progress(object):
     def __init__(self, total, name=''):
@@ -109,9 +111,11 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         self._tn_info = None
         self._driver = None
         self._vm = None
+        self._neutron_device_id = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
+
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -125,6 +129,11 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
                 self._neutron_device_id = namespace.tenant_id
                 self._vm = vm
                 #utils.add_vlink(self, context, namespace.vdom)
+                cmd = ''
+                for intf in self.intf:
+                    # set tap port up
+                    cmd = cmd + 'ifconfig %s up \n' % intf.extern_name
+                subprocess.Popen(cmd, shell=True)
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
                           {"router": router})
@@ -142,6 +151,8 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         ip = port['fixed_ips'][0]['ip_address']
         mask = '255.255.255.0'
         intf_id = -1
+        ovsdb = ovsctl.OvsCtlBlock()
+        tag = ovsdb.get_port_tag(port['id'])
 
         if is_gw:
             intf_id = tn_drv.MANAGE_INTF_ID
@@ -163,6 +174,10 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
             self.intf[intf_id].mask = mask
             self.intf[intf_id].status = True
             self._vm.config_intf_ip(intf_id, ip, mask)
+            ovsdb.add_port(l3_tn.INT_BRIDGE_NAME, self.intf[intf_id].extern_name)
+            ovsdb.add_port_tag(self.intf[intf_id].extern_name, tag)
+
+            print("add port :", port['id'], intf_id, tag)
         else:
             LOG.error('add router interface fail!')
 
@@ -301,6 +316,7 @@ def port_migration(context, l3_driver):
 
 
 
+
 def router_migration(context, l3_driver):
     """
     # table routers, router_extra_attributes
@@ -380,7 +396,6 @@ def main():
         l3_driver = Fake_TNL3ServicePlugin()
         router_migration(context, l3_driver)
         port_migration(context, l3_driver)
-
 
         '''
         print("step7")
