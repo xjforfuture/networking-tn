@@ -128,9 +128,17 @@ class TNOSvm():
         self.into_interface(MANAGE_INTF_ID)
         self.subprocess.stdin.write('manage ping\n')
 
+        #for debug
         self.into_interface(1)
         self.subprocess.stdin.write('zone trust \n')
         self.subprocess.stdin.write('manage ping\n')
+
+        self.into_interface(2)
+        cmd = 'ip address 90.1.1.1/24\n'
+        self.subprocess.stdin.write(cmd)
+        self.subprocess.stdin.write('zone trust \n')
+        self.subprocess.stdin.write('manage ping\n')
+        self.subprocess.stdin.write('manage telnet\n')
 
     def enable_http(self):
         self.into_interface(MANAGE_INTF_ID)

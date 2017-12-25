@@ -68,6 +68,11 @@ class OvsCtlBlock():
             cmd = self.ovs_db.add_port(bridge=bridge_name, may_exist=False, port=port_name)
             txn.add(cmd)
 
+    def del_port(self, bridge_name, port_name):
+        with self.ovs_db.transaction() as txn:
+            cmd = self.ovs_db.del_port(bridge=bridge_name, if_exists=True, port=port_name)
+            txn.add(cmd)
+
     def add_port_tag(self, port_name, tag):
         port_names = []
         port_names.append(port_name)
@@ -100,7 +105,7 @@ class OvsCtlBlock():
                                         if_exists=True).execute(check_error=True, log_errors=True)
         for cur_info in port_info:
             if cur_info['name'][3:] in port_name:
-                return cur_info['tag']
+                return (cur_info['name'], cur_info['tag'])
 
     def conf_list(self):
         port_info = self.ovs_db.db_list("Port", None, columns=["name", "tag", "other_config"],

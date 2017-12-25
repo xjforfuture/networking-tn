@@ -152,7 +152,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         mask = '255.255.255.0'
         intf_id = -1
         ovsdb = ovsctl.OvsCtlBlock()
-        tag = ovsdb.get_port_tag(port['id'])
+        (port_name, tag) = ovsdb.get_port_tag(port['id'])
 
         if is_gw:
             intf_id = tn_drv.MANAGE_INTF_ID
@@ -169,6 +169,9 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
                         break
 
         if intf_id >= 0:
+            #delete tmp, need later
+            #ovsdb.del_port(l3_tn.INT_BRIDGE_NAME, port_name)
+
             self.intf[intf_id].neutron_intf_id = port['id']
             self.intf[intf_id].ip = ip
             self.intf[intf_id].mask = mask
@@ -176,8 +179,6 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
             self._vm.config_intf_ip(intf_id, ip, mask)
             ovsdb.add_port(l3_tn.INT_BRIDGE_NAME, self.intf[intf_id].extern_name)
             ovsdb.add_port_tag(self.intf[intf_id].extern_name, tag)
-
-            print("add port :", port['id'], intf_id, tag)
         else:
             LOG.error('add router interface fail!')
 
@@ -340,7 +341,6 @@ def router_migration(context, l3_driver):
 
     records = tn_db.query_records(context, l3_models.Router)
 
-    print(records)
     with Progress(len(records), 'router_migration') as p:
         for record in records:
             reset(router_obj)
