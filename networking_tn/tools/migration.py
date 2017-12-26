@@ -153,6 +153,10 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         intf_id = -1
         ovsdb = ovsctl.OvsCtlBlock()
         (port_name, tag) = ovsdb.get_port_tag(port['id'])
+        if port_name is None:
+            return
+
+        print("port %s , tag %d" % (port_name, tag))
 
         if is_gw:
             intf_id = tn_drv.MANAGE_INTF_ID

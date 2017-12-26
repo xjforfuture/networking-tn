@@ -103,9 +103,13 @@ class OvsCtlBlock():
 
         port_info = self.ovs_db.db_list("Port", None, columns=["name", "tag", "other_config"],
                                         if_exists=True).execute(check_error=True, log_errors=True)
-        for cur_info in port_info:
-            if cur_info['name'][3:] in port_name:
+        # todo xiongjun.  router interface name must be rename
+        info = [x for x in port_info if len(x['name'])>10]
+        for cur_info in info:
+            if cur_info['name'][3:13] in port_name:
                 return (cur_info['name'], cur_info['tag'])
+
+        return (None, None)
 
     def conf_list(self):
         port_info = self.ovs_db.db_list("Port", None, columns=["name", "tag", "other_config"],

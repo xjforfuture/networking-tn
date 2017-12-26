@@ -134,9 +134,9 @@ class TNOSvm():
         self.subprocess.stdin.write('manage ping\n')
 
         self.into_interface(2)
+        self.subprocess.stdin.write('zone trust \n')
         cmd = 'ip address 90.1.1.1/24\n'
         self.subprocess.stdin.write(cmd)
-        self.subprocess.stdin.write('zone trust \n')
         self.subprocess.stdin.write('manage ping\n')
         self.subprocess.stdin.write('manage telnet\n')
 
