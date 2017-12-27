@@ -27,8 +27,6 @@ VIRT_STATE_MAP = ['running',
                   'shutdown',
                   'crashed']
 
-MANAGE_INTF_ID = 0
-
 class TNOSvm():
     kvm_cmd = 'kvm -nographic ' \
                   + '-device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing ' \

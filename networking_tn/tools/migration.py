@@ -58,13 +58,13 @@ cfg.CONF.import_group('ml2_tn', 'networking_tn.common.config')
 
 from networking_tn.common import resources
 from networking_tn.common import utils
-from networking_tn.ml2 import mech_tn
 from networking_tn.services.l3_router import l3_tn
 from networking_tn.tasks import tasks
 from networking_tn.tasks import constants as t_consts
 from networking_tn.db import models as tn_db
-from networking_tn.tnosclient import tnos_driver as tn_drv
+from networking_tn.tnosclient import tnos_router as tnos
 from networking_tn.ovsctl import ovsctl
+from networking_tn.common import config
 
 class Progress(object):
     def __init__(self, total, name=''):
@@ -109,31 +109,24 @@ class Fake_context(object):
 class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def __init__(self):
         self._tn_info = None
-        self._driver = None
-        self._vm = None
-        self._neutron_device_id = None
+        self._router = []
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
-
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
         # Limit one router per tenant
         if not router.get('router', None):
             return
-        tenant_id = router['router']['id']
+
+        router_id = router['router']['id']
+        router_name = router['router']['name']
         with context.session.begin(subtransactions=True):
             try:
-                namespace, vm = utils.add_vdom(self, context, tenant_id=tenant_id)
-                self._neutron_device_id = namespace.tenant_id
-                self._vm = vm
-                #utils.add_vlink(self, context, namespace.vdom)
-                cmd = ''
-                for intf in self.intf:
-                    # set tap port up
-                    cmd = cmd + 'ifconfig %s up \n' % intf.extern_name
-                subprocess.Popen(cmd, shell=True)
+                router = tnos.TnosRouter(router_id, router_name, self._tn_info['image_path'])
+                self._router.append(router)
+
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
                           {"router": router})
@@ -143,11 +136,8 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
 
 
     def add_router_interface(self, context, port, is_gw):
-        """creates vlnk on the fortinet device."""
-        db_namespace = tn_db.query_record(context,
-                                tn_db.Fortinet_ML2_Namespace,
-                                tenant_id=port['device_id'])
 
+        router_id = port['device_id']
         ip = port['fixed_ips'][0]['ip_address']
         mask = '255.255.255.0'
         intf_id = -1
@@ -156,18 +146,19 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         if port_name is None:
             return
 
-        print("port %s , tag %d" % (port_name, tag))
+        router = self.get_router(router_id)
 
         if is_gw:
-            intf_id = tn_drv.MANAGE_INTF_ID
-            self.intf[intf_id].is_gw = True
+            intf_id = tnos.MANAGE_INTF_ID
+            router.intfs[intf_id].is_gw = True
+            router.set_restful_api_client(config.get_apiclient(ip))
         else:
-            for intf in self.intf:
+            for intf in router.intfs:
                 if intf.status:
                     continue
                 else:
-                    intf_id = self.intf.index(intf)
-                    if intf_id == tn_drv.MANAGE_INTF_ID:
+                    intf_id = router.intfs.index(intf)
+                    if intf_id == tnos.MANAGE_INTF_ID:
                         intf_id = -1
                     else:
                         break
@@ -176,24 +167,30 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
             #delete tmp, need later
             #ovsdb.del_port(l3_tn.INT_BRIDGE_NAME, port_name)
 
-            self.intf[intf_id].neutron_intf_id = port['id']
-            self.intf[intf_id].ip = ip
-            self.intf[intf_id].mask = mask
-            self.intf[intf_id].status = True
-            self._vm.config_intf_ip(intf_id, ip, mask)
-            ovsdb.add_port(l3_tn.INT_BRIDGE_NAME, self.intf[intf_id].extern_name)
-            ovsdb.add_port_tag(self.intf[intf_id].extern_name, tag)
+            intf = router.intfs[intf_id]
+            intf.id = port['id']
+            intf.ip = ip
+            intf.mask = mask
+            intf.status = True
+
+            router.vm.config_intf_ip(intf_id, ip, mask)
+            ovsdb.add_port(l3_tn.INT_BRIDGE_NAME, intf.extern_name)
+            ovsdb.add_port_tag(intf.extern_name, tag)
+
+            if is_gw:
+                #config getway
+                router.add_static_route('0.0.0.0','0.0.0.0', ip)
+            else:
+                '''
+                utils.add_fwpolicy(self, context,
+                                   vdom=db_namespace.vdom,
+                                   srcintf=self.intf[intf_id].inner_name,
+                                   dstintf=self.intf[tn_drv.MANAGE_INTF_ID].inner_name,
+                                   nat='enable')
+                '''
+
         else:
             LOG.error('add router interface fail!')
-
-
-        '''
-        utils.add_fwpolicy(self, context,
-                           vdom=db_namespace.vdom,
-                           srcintf=vlan_inf,
-                           dstintf=int_intf,
-                           nat='enable')
-        '''
 
     def _get_floatingip(self, context, id):
         return tn_db.query_record(context, l3_models.FloatingIP, id=id)
@@ -294,28 +291,23 @@ def port_migration(context, l3_driver):
     records = tn_db.query_records(context, models_v2.Port)
 
     with Progress(len(records), 'port_migration') as p:
-         for record in records:
+        for record in records:
             reset(port)
             cls2dict(record, port)
 
-            print(port)
-
-            '''
-            if not port['fixed_ips']:
-                fixed_ips = []
-                for fixed_ip in port['fixed_ips']:
-                    cls2dict(fixed_ip, ipallocation)
-                    fixed_ips.append(ipallocation)
-                port['fixed_ips'] = fixed_ips
-            '''
-
             db_routerport = tn_db.query_record(context, l3_models.RouterPort, port_id=record.id)
 
-            if l3_driver._neutron_device_id == record.device_id:
-                if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
-                    l3_driver.add_router_interface(context, port, False)
-                elif getattr(db_routerport, 'port_type', None) in [ROUTER_GW]:
-                    l3_driver.add_router_interface(context, port, True)
+            if getattr(db_routerport, 'port_type', None) in [ROUTER_GW]:
+                l3_driver.add_router_interface(context, port, True)
+                p.update()
+
+        for record in records:
+            reset(port)
+            cls2dict(record, port)
+            db_routerport = tn_db.query_record(context, l3_models.RouterPort, port_id=record.id)
+
+            if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF]:
+                l3_driver.add_router_interface(context, port, False)
 
             p.update()
 

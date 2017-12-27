@@ -24,6 +24,11 @@ try:
 except Exception:
     import logging
 
+try:
+    from oslo_serialization import jsonutils
+except Exception:
+    import json as jsonutils
+
 from networking_tn.tnosclient import base
 from networking_tn.tnosclient.common import constants as csts
 from networking_tn.tnosclient import eventlet_request
@@ -149,9 +154,36 @@ class EventletApiClient(base.ApiClientBase):
                 LOG.error('Login error "%s"', ret)
                 raise ret
 
-            cookie = ret.getheader("Set-Cookie")
+            #cookie = ret.getheader("Set-Cookie")
+            body = jsonutils.loads(ret.body)
+            cookie = body['reply']['token']
             if cookie:
+                cookie = 'Token=' + str(cookie)
                 LOG.debug("Saving new authentication cookie '%s'", cookie)
+            else:
+                LOG.debug('***cookie is None')
+
+        return cookie
+
+    def _touch(self, conn=None, headers=None):
+        '''Issue login request and update authentication cookie.'''
+        cookie = None
+        g = eventlet_request.TouchRequestEventlet(self, conn, headers)
+        g.start()
+        ret = g.join()
+        if ret:
+            if isinstance(ret, Exception):
+                LOG.error('Touch error "%s"', ret)
+                raise ret
+
+            #cookie = ret.getheader("token")
+            body = jsonutils.loads(ret.body)
+            cookie = body['reply']['token']
+            if cookie:
+                cookie = 'Token=' + str(cookie)
+                LOG.debug("Saving new authentication cookie '%s'", cookie)
+            else:
+                LOG.debug('***cookie is None')
 
         return cookie
 

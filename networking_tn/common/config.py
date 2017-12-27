@@ -70,7 +70,7 @@ ML2_TN = [
 cfg.CONF.register_opts(ML2_TN, "ml2_tn")
 
 tn_info = {
-    'image_patch' : cfg.CONF.ml2_tn.vm_image_path,
+    'image_path' : cfg.CONF.ml2_tn.vm_image_path,
     'address': cfg.CONF.ml2_tn.address,
     'port': cfg.CONF.ml2_tn.port,
     'protocol': cfg.CONF.ml2_tn.protocol,
@@ -92,9 +92,10 @@ tn_info = {
 }
 
 
-def get_apiclient():
+def get_apiclient(address=None):
     """Fortinet api client initialization."""
-    api_server = [(tn_info['address'], tn_info['port'],
+    api_server = [(address if address else tn_info['address'], tn_info['port'],
                   'https' == tn_info['protocol'])]
     return client.FortiosApiClient(
         api_server, tn_info['username'], tn_info['password'])
+

@@ -185,6 +185,20 @@ class LoginRequestEventlet(EventletApiRequest):
             return self.value.getheader("Set-Cookie")
         return None
 
+class TouchRequestEventlet(EventletApiRequest):
+    '''Process a login request.'''
+
+    def __init__(self, client_obj, client_conn=None,
+                 headers=None):
+        if headers is None:
+            headers = {}
+        headers.update({"Content-Type": "application/x-www-form-urlencoded"})
+        message = client_obj._render(templates.TOUCH)
+        body = message['body'] if 'body' in message else None
+        super(TouchRequestEventlet, self).__init__(
+            client_obj, message['path'], message['method'], body, headers,
+            auto_login=True, client_conn=client_conn)
+
 
 class GetApiProvidersRequestEventlet(EventletApiRequest):
     '''Get a list of API providers.'''

@@ -156,6 +156,7 @@ class ApiClientBase(object):
                    'qsize': qsize})
         if auto_login and self.auth_cookie(conn) is None:
             self._wait_for_login(conn, headers)
+            self._wait_for_touch(conn, headers)
         return conn
 
     def release_connection(self, http_conn, bad_state=False,
@@ -238,6 +239,25 @@ class ApiClientBase(object):
                 provider_sem.release()
         else:
             LOG.debug("Waiting for auth to complete")
+            # Wait until we can acquire then release
+            provider_sem.acquire(blocking=True)
+            provider_sem.release()
+
+    def _wait_for_touch(self, conn, headers=None):
+        data = self._get_provider_data(conn)
+        if data is None:
+            LOG.error(_LE("touch request for an invalid connection: '%s'"),
+                      api_client.ctrl_conn_to_str(conn))
+            return
+        provider_sem = data[0]
+        if provider_sem.acquire(blocking=False):
+            try:
+                cookie = self._touch(conn, headers)
+                self.set_auth_cookie(conn, cookie)
+            finally:
+                provider_sem.release()
+        else:
+            LOG.debug("Waiting for touch to complete")
             # Wait until we can acquire then release
             provider_sem.acquire(blocking=True)
             provider_sem.release()

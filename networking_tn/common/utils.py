@@ -238,7 +238,7 @@ def add_resource_with_id(obj, context, record, resource, **kwargs):
         except exception.ResourceNotFound:
             pass
     else:
-        # TODO(samsu): may add search existing data in devices later
+        # TODO(xiongjun: may add search existing data in devices later
         pass
     return op(obj, context, resource.add, **kwargs)
 
@@ -317,7 +317,6 @@ def add_vdom(obj, context, **kwargs):
     namespace = add_record(obj, context, fortinet_db.Fortinet_ML2_Namespace,
                            **kwargs)
 
-    print('debug namespace %s ' % (namespace))
     '''
     try:
         op(obj, context, resources.Vdom.get, name=namespace.vdom)

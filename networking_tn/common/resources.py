@@ -119,6 +119,7 @@ class Base(object):
         # all ops should be defined in the templates
         name = re.findall("[A-Z][^A-Z]*", cls.__name__)
         op = "%s_%s" % (str(action).upper(), "_".join(name).upper())
+        LOG.debug('***request: %s' % op)
         try:
             return client.request(op, **data)
         except api_ex.ApiException as e:

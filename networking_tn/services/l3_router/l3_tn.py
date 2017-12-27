@@ -52,19 +52,6 @@ INT_BRIDGE_NAME = 'br-int'
 
 LOG = logging.getLogger(__name__)
 
-ROUTER_MAX_INTF = 3
-
-class TNL3Interface():
-    def __init__(self, extern_name, inner_name, intf_id=None, status=None):
-        self.neutron_intf_id = intf_id
-        self.status = status
-        self.extern_name = extern_name
-        self.inner_name = inner_name
-        self.mac = None
-        self.ip = None
-        self.mask = None
-        self.is_gw = None
-
 class TNL3ServicePlugin(router.L3RouterPlugin):
     """Fortinet L3 service Plugin."""
 
@@ -74,9 +61,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         """Initialize Fortinet L3 service Plugin."""
         super(TNL3ServicePlugin, self).__init__()
         self._tn_info = None
-        self._driver = None
-        self._vm = None
-        self._neutron_device_id = None
+        self._router = []
+        #self._driver = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
@@ -85,11 +71,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         """Fortinet specific initialization for this class."""
         LOG.debug("TNL3ServicePlugin_init")
         self._tn_info = config.tn_info
-        self._driver = config.get_apiclient()
-        self.intf = []
-        for i in range(ROUTER_MAX_INTF):
-            intf = TNL3Interface('tap'+str(i), 'ethernet'+str(i))
-            self.intf.append(intf)
+        #self._driver = config.get_apiclient()
 
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
 
@@ -142,6 +124,12 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 LOG.error(_LE("Failed to delete_router routerid=%(id)s"),
                           {"id": id})
                 resources.Exinfo(e)
+
+    def get_router(self, router_id):
+        for router in self._router:
+            if router.id == router_id:
+                return router
+
 
     def add_router_interface(self, context, router_id, interface_info):
         """creates vlnk on the fortinet device."""

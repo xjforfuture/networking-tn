@@ -125,7 +125,7 @@ class ApiRequest(object):
                 if (self._url != jsonutils.loads(templates.LOGIN)['path'] and
                     cookie):
                     headers['Cookie'] = cookie['Cookie']
-                    headers['X-CSRFTOKEN'] = cookie['X-CSRFTOKEN']
+                    #headers['X-CSRFTOKEN'] = cookie['X-CSRFTOKEN']
 
                 try:
                     if self._body:
