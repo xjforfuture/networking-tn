@@ -34,6 +34,15 @@ LOGIN = """
 }
 """
 
+RELOGIN = """login?redir=%2fapi%2fv2"""
+
+LOGOUT = """
+{
+    "path": "/api/user/logout",
+    "method": "POST"
+}
+"""
+
 TOUCH = """
 {
     "path": "/api/user/touch",
@@ -43,14 +52,88 @@ TOUCH = """
 
 SET_STATIC_ROUTE = """
 {
-    "path": "/api/router_static/*",
+    "path": "/api/router_static/?vdom=root",
     "method": "POST",
     "body": {
-        dest: "{{ dest }}", 
-        distance: "10", 
-        netmask: "{{ netmask }}", 
-        gw_type: "ip", 
-        gw_ip: "{{ gw_ip }}"
+        "dest": "{{ dest }}", 
+        "distance": "10", 
+        "netmask": "{{ netmask }}", 
+        "gw_type": "ip", 
+        "gw_ip": "{{ gw_ip }}"
     }
 }
+"""
+
+ADD_ADDRESS_ENTRY = """
+{
+    "path": "/api/system_address?vdom=root",
+    "method": "POST",
+    "body": {
+        "mkey": "{{ name }}", 
+        {% if type is defined %}
+            "type": "{{ type }}",
+        {% else %}
+            "type": "ip-prefix",
+        {% endif %}
+        
+        {% if ip_prefix is defined %}
+            "ip-prefix": "{{ ip_prefix }}"
+        {% else %}
+            "ip-min": "{{ ip_min }}"
+            "ip-max": "{{ ip_max }}"
+        {% endif %}
+            
+    }
+}
+"""
+
+ADD_SNAT = """
+    "path": "/api/policy_nat_source_nat/?vdom=root",
+    "method": "POST",
+    "body": {
+        "id": {{ id }}
+        
+        {% if desc is define %}
+            "description": "{{ desc }}",
+        {% endif %}
+        
+        "saddr":"{{ saddr }}"
+        
+        {% if daddr is define %}
+            "daddr": "{{ daddr }}",
+        {% else %}
+            "daddr":"Any",
+        {% endif %}
+        
+        {% if eif is define %}
+            "eif": "{{ eif }}"
+        {% endif %}
+        
+        {% if log_flag is define %}
+            "log":"{{ log_flag }}"
+        {% else %}
+            "log":"disable"
+        {% endif %}
+        
+        {% if reverse_flag is define %}
+            "reverse":"{{ reverse_flag }}"
+        {% else %}
+            "reverse":"disable"
+        {% endif %}
+        
+        {% if service is define %}
+            "service":"{{ service }}"
+        {% else %}
+            "service":"Any"
+        {% endif %}
+        
+        
+        "status":"enable"
+        "sticky":"disable"
+        "trans":"trans-to"
+        "trans_addr":"gw_addr"
+        "trans_mode":"static"
+        
+    }
+
 """

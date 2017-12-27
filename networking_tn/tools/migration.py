@@ -180,7 +180,13 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
             if is_gw:
                 #config getway
                 router.add_static_route('0.0.0.0','0.0.0.0', ip)
+
+                router.add_address_entry('gw_addr', ip, str(32))
+
             else:
+                addr_name = port['network_id'][:16]
+                router.add_address_entry(addr_name, ip, str(24))
+
                 '''
                 utils.add_fwpolicy(self, context,
                                    vdom=db_namespace.vdom,

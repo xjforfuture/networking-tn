@@ -19,12 +19,16 @@ def create_tnos(name, image_path):
         tnos.stop()
         tnos.start()
 
-    tnos.enable_http()
-    tnos.enable_https()
-    tnos.enable_ping()
-    tnos.enable_telnet()
+    tnos.enable_http(MANAGE_INTF_ID)
+    tnos.enable_https(MANAGE_INTF_ID)
+    tnos.enable_ping(MANAGE_INTF_ID)
+    tnos.enable_telnet(MANAGE_INTF_ID)
 
     return tnos
+
+def add_nat():
+    pass
+
 
 class TNL3Interface():
     def __init__(self, extern_name, inner_name, intf_id=None, status=None):
@@ -62,6 +66,10 @@ class TnosRouter():
         self.api_client = client
 
     def add_static_route(self, dest, netmask, gw_ip):
-        self.api_client.request(templates.SET_STATIC_ROUTE, dest=dest, netmask=netmask, gw_ip=gw_ip)
+        self.api_client.request('SET_STATIC_ROUTE', dest=dest, netmask=netmask, gw_ip=gw_ip)
+
+    def add_address_entry(self, addr_name, ip, prefix):
+        ip_prefix = ip + '/' + prefix
+        self.api_client.request('ADD_ADDRESS_ENTRY', name=addr_name, ip_prefix=ip_prefix)
 
 

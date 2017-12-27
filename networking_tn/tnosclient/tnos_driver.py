@@ -122,8 +122,8 @@ class TNOSvm():
         cmd = 'ip address '+ ip + ' ' + mask +'\n'
         self.subprocess.stdin.write(cmd)
 
-    def enable_ping(self):
-        self.into_interface(MANAGE_INTF_ID)
+    def enable_ping(self, intf_id):
+        self.into_interface(intf_id)
         self.subprocess.stdin.write('manage ping\n')
 
         #for debug
@@ -138,16 +138,16 @@ class TNOSvm():
         self.subprocess.stdin.write('manage ping\n')
         self.subprocess.stdin.write('manage telnet\n')
 
-    def enable_http(self):
-        self.into_interface(MANAGE_INTF_ID)
+    def enable_http(self, intf_id):
+        self.into_interface(intf_id)
         self.subprocess.stdin.write('manage http\n')
 
-    def enable_https(self):
-        self.into_interface(MANAGE_INTF_ID)
+    def enable_https(self, intf_id):
+        self.into_interface(intf_id)
         self.subprocess.stdin.write('manage https\n')
 
-    def enable_telnet(self):
-        self.into_interface(MANAGE_INTF_ID)
+    def enable_telnet(self, intf_id):
+        self.into_interface(intf_id)
         self.subprocess.stdin.write('manage telnet\n')
 
     def display_config(self, line_num=1024):
@@ -171,7 +171,7 @@ def main():
         print("TNOS is not running")
 
     tnos.login()
-    tnos.config_intf_ip(MANAGE_INTF_ID, '20.1.1.3', '255.255.255.0')
+    tnos.config_intf_ip(0, '20.1.1.3', '255.255.255.0')
     tnos.display_config()
 
     #tnos.destroy()
