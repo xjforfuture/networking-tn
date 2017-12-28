@@ -186,6 +186,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
             else:
                 addr_name = port['network_id'][:16]
                 router.add_address_entry(addr_name, ip, str(24))
+                router.add_address_snat(id='1', saddr=addr_name, trans_addr='gw_addr')
 
                 '''
                 utils.add_fwpolicy(self, context,
@@ -305,7 +306,6 @@ def port_migration(context, l3_driver):
 
             if getattr(db_routerport, 'port_type', None) in [ROUTER_GW]:
                 l3_driver.add_router_interface(context, port, True)
-                p.update()
 
         for record in records:
             reset(port)

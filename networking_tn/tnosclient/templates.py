@@ -52,12 +52,16 @@ TOUCH = """
 
 SET_STATIC_ROUTE = """
 {
-    "path": "/api/router_static/?vdom=root",
+    "path": "/api/router_static?vdom=root",
     "method": "POST",
     "body": {
         "dest": "{{ dest }}", 
-        "distance": "10", 
-        "netmask": "{{ netmask }}", 
+        
+        {% if distance is defined %}
+            "distance": "{{ defined }}", 
+        {% endif %}
+        
+        "netmask": "{{ netmask }}",
         "gw_type": "ip", 
         "gw_ip": "{{ gw_ip }}"
     }
@@ -79,7 +83,7 @@ ADD_ADDRESS_ENTRY = """
         {% if ip_prefix is defined %}
             "ip-prefix": "{{ ip_prefix }}"
         {% else %}
-            "ip-min": "{{ ip_min }}"
+            "ip-min": "{{ ip_min }}",
             "ip-max": "{{ ip_max }}"
         {% endif %}
             
@@ -87,53 +91,109 @@ ADD_ADDRESS_ENTRY = """
 }
 """
 
-ADD_SNAT = """
+ADD_ADDRESS_SNAT = """
+{
     "path": "/api/policy_nat_source_nat/?vdom=root",
     "method": "POST",
     "body": {
-        "id": {{ id }}
+        "id": "{{ id }}",
         
-        {% if desc is define %}
+        {% if desc is defined %}
             "description": "{{ desc }}",
         {% endif %}
         
-        "saddr":"{{ saddr }}"
+        "saddr":"{{ saddr }}",
         
-        {% if daddr is define %}
+        {% if daddr is defined %}
             "daddr": "{{ daddr }}",
         {% else %}
             "daddr":"Any",
         {% endif %}
         
-        {% if eif is define %}
-            "eif": "{{ eif }}"
+        {% if eif is defined %}
+            "eif": "{{ eif }}",
         {% endif %}
         
-        {% if log_flag is define %}
-            "log":"{{ log_flag }}"
+        {% if log_flag is defined %}
+            "log":"{{ log_flag }}",
         {% else %}
-            "log":"disable"
+            "log":"disable",
         {% endif %}
         
-        {% if reverse_flag is define %}
-            "reverse":"{{ reverse_flag }}"
+        {% if reverse_flag is defined %}
+            "reverse":"{{ reverse_flag }}",
         {% else %}
-            "reverse":"disable"
+            "reverse":"disable",
         {% endif %}
         
-        {% if service is define %}
-            "service":"{{ service }}"
+        {% if service is defined %}
+            "service":"{{ service }}",
         {% else %}
-            "service":"Any"
+            "service":"Any",
         {% endif %}
         
+        {% if status is defined %}
+            "status":"{{ status }}",
+        {% else %}
+            "status":"enable",
+        {% endif %}
         
-        "status":"enable"
-        "sticky":"disable"
-        "trans":"trans-to"
-        "trans_addr":"gw_addr"
-        "trans_mode":"static"
+        {% if sticky_flag is defined %}
+            "sticky":"{{ sticky_flag }}",
+        {% else %}
+            "sticky":"disable",
+        {% endif %}
         
+        {% if trans is defined %}
+            "trans":"{{ trans }}",
+        {% else %}
+            "trans":"trans-to",
+        {% endif %}
+        
+        "trans_addr":"{{ trans_addr }}",
+        
+        {% if trans_mode is defined %}
+            "trans_mode":"{{ trans_mode }}"
+        {% else %}
+            "trans_mode":"static"
+        {% endif %}
     }
-
+}
 """
+
+ADD_ADDRESS_ENTRY = """
+{
+    "path": "/api/system_address?vdom=root",
+    "method": "POST",
+    "body": {
+        id:"{{ id }}",
+        mkey:"{{ name }}",
+        action:"{{ action }}",
+        
+        {% if desc is defined %}
+            description:"{{ desc }}",
+        {% endif %}
+        
+        {%  %}
+        daddr:["Any"],
+            0:"Any"
+        
+        destinationAddr:"address",
+        dzone:"trust",
+        
+        saddr:["Any"],
+            0:"Any"
+        serGroup:"address",
+        service:["Any"],
+            0:"Any"
+        sourceAddr:"address",
+        status:"enable",
+        szone:"trust"
+    }
+}
+"""
+
+
+
+
+

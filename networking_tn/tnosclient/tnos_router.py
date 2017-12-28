@@ -72,4 +72,7 @@ class TnosRouter():
         ip_prefix = ip + '/' + prefix
         self.api_client.request('ADD_ADDRESS_ENTRY', name=addr_name, ip_prefix=ip_prefix)
 
+    def add_address_snat(self, id, saddr, trans_addr):
+        self.api_client.request('ADD_ADDRESS_SNAT', id=id, saddr=saddr, trans_addr=trans_addr)
+
 
