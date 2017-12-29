@@ -65,8 +65,8 @@ class TnosRouter():
     def set_restful_api_client(self, client):
         self.api_client = client
 
-    def add_static_route(self, dest, netmask, gw_ip):
-        self.api_client.request('SET_STATIC_ROUTE', dest=dest, netmask=netmask, gw_ip=gw_ip)
+    def add_static_route(self, **msg):
+        self.api_client.request('ADD_STATIC_ROUTE', **msg)
 
     def add_address_entry(self, addr_name, ip, prefix):
         ip_prefix = ip + '/' + prefix
@@ -74,5 +74,11 @@ class TnosRouter():
 
     def add_address_snat(self, id, saddr, trans_addr):
         self.api_client.request('ADD_ADDRESS_SNAT', id=id, saddr=saddr, trans_addr=trans_addr)
+
+    def add_rule(self, **msg):
+        self.api_client.request('ADD_RULE', **msg)
+
+    def add_default_permit_rule(self, **msg):
+        self.add_rule(id='1', action='permit', **msg)
 
 

@@ -50,23 +50,36 @@ TOUCH = """
 }
 """
 
-SET_STATIC_ROUTE = """
+ADD_STATIC_ROUTE = """
 {
     "path": "/api/router_static?vdom=root",
     "method": "POST",
     "body": {
-        "dest": "{{ dest }}", 
         
-        {% if distance is defined %}
-            "distance": "{{ defined }}", 
+        {% if gw_type is defined %}
+            "gw_type": "{{ gw_type }}",
+        {% else %}
+            "gw_type": "ip",
+        {% endif %} 
+        
+        {% if gw_ip is defined %}
+            "gw_ip": "{{ gw_ip }}",
         {% endif %}
         
-        "netmask": "{{ netmask }}",
-        "gw_type": "ip", 
-        "gw_ip": "{{ gw_ip }}"
+        {% if gw_interface is defined %}
+            "gw_interface": "{{ gw_interface }}",
+        {% endif %}
+        
+        {% if distance is defined %}
+            "distance": "{{ distance }}",
+        {% endif %}
+        
+        "dest": "{{ dest }}", 
+        "netmask": "{{ netmask }}"
     }
 }
 """
+
 
 ADD_ADDRESS_ENTRY = """
 {
@@ -161,34 +174,87 @@ ADD_ADDRESS_SNAT = """
 }
 """
 
-ADD_ADDRESS_ENTRY = """
+ADD_RULE = """
 {
-    "path": "/api/system_address?vdom=root",
+    "path": "/api/policy_security_rule?vdom=root",
     "method": "POST",
     "body": {
-        id:"{{ id }}",
-        mkey:"{{ name }}",
-        action:"{{ action }}",
-        
+        "id":"{{ id }}",
+        "action":"{{ action }}",
+        "mkey":"{{ name }}",
+
         {% if desc is defined %}
-            description:"{{ desc }}",
+            "description":"{{ desc }}",
         {% endif %}
         
-        {%  %}
-        daddr:["Any"],
-            0:"Any"
+        {% if daddrs is defined %}
+            "daddr": [
+                {% for daddr in daddrs[:-1] %}
+                    "{{ daddr }}",
+                {% endfor %}
+                "{{ daddrs[-1] }}"
+            ],
+        {% else %}
+            "daddr":["Any"],
+        {% endif %}
         
-        destinationAddr:"address",
-        dzone:"trust",
+        {% if destinationAddr is defined %}
+            "destinationAddr":"{{ destinationAddr }}",
+        {% else %}
+            "destinationAddr":"address",
+        {% endif %}
         
-        saddr:["Any"],
-            0:"Any"
-        serGroup:"address",
-        service:["Any"],
-            0:"Any"
-        sourceAddr:"address",
-        status:"enable",
-        szone:"trust"
+        {% if dzone is defined %}
+            "dzone":"{{ dzone }}",
+        {% else %}
+            "dzone":"trust",
+        {% endif %}
+            
+        {% if saddrs is defined %}
+            "saddr": [
+                {% for saddr in saddrs[:-1] %}
+                    "{{ saddr }}",
+                {% endfor %}
+                "{{ saddrs[-1] }}"
+            ],
+        {% else %}
+            "saddr":["Any"],
+        {% endif %}
+            
+        {% if serGroup is defined %}
+            "serGroup":"{{ serGroup }}",
+        {% else %}
+            "serGroup":"address",
+        {% endif %}
+            
+        {% if services is defined %}
+            "service": [
+                {% for service in services[:-1] %}
+                    "{{ service }}",
+                {% endfor %}
+                "{{ services[-1] }}"
+            ],
+        {% else %}
+            "service":["Any"],
+        {% endif %}    
+            
+        {% if sourceAddr is defined %}
+            "sourceAddr":"{{ sourceAddr }}",
+        {% else %}
+            "sourceAddr":"address",
+        {% endif %}
+        
+        {% if status is defined %}
+            "status":"{{ status }}",
+        {% else %}
+            "status":"enable",
+        {% endif %}        
+        
+        {% if szone is defined %}
+            "szone":"{{ szone }}"
+        {% else %}
+            "szone":"trust"
+        {% endif %}
     }
 }
 """

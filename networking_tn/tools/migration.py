@@ -179,7 +179,10 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
 
             if is_gw:
                 #config getway
-                router.add_static_route('0.0.0.0','0.0.0.0', ip)
+                tmp = ip.split('.')
+                tmp[-1] = '1'
+                gw_ip = '.'.join(tmp)
+                router.add_static_route(dest="0.0.0.0", netmask="0.0.0.0", gw_ip=gw_ip)
 
                 router.add_address_entry('gw_addr', ip, str(32))
 
@@ -320,6 +323,7 @@ def port_migration(context, l3_driver):
 
 
 
+
 def router_migration(context, l3_driver):
     """
     # table routers, router_extra_attributes
@@ -349,6 +353,10 @@ def router_migration(context, l3_driver):
             cls2dict(record, router_obj)
             l3_driver.create_router(context, router)
             p.update()
+
+def firewall_migration(context, l3_driver):
+    for router in l3_driver._router:
+        router.add_default_permit_rule(name='default_permit')
 
 def floatingip_migration(context, l3_driver):
     """
@@ -398,12 +406,7 @@ def main():
         l3_driver = Fake_TNL3ServicePlugin()
         router_migration(context, l3_driver)
         port_migration(context, l3_driver)
-
-        '''
-        print("step7")
-        floatingip_migration(context, l3_driver)
-        print("step8")
-        '''
+        firewall_migration(context, l3_driver)
 
     except Exception as e:
         raise(e)
