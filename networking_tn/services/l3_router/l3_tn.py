@@ -39,6 +39,7 @@ from networking_tn.common import utils
 from networking_tn.db import models as tn_db
 from networking_tn.tasks import constants as t_consts
 from networking_tn.tasks import tasks
+from networking_tn.tnosclient import tnos_router as tnos
 
 # TODO(samsu): the folowing two imports just for testing purpose
 # TODO(samsu): need to be deleted later
@@ -75,6 +76,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
 
+"""
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s", router)
         # Limit one router per tenant
@@ -97,6 +99,29 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
         return super(TNL3ServicePlugin, self).\
             create_router(context, router)
+"""
+
+    def create_router(self, context, router):
+        LOG.debug("create_router: router=%s" % (router))
+        # Limit one router per tenant
+        if not router.get('router', None):
+            return
+
+        router_id = router['router']['id']
+        router_name = router['router']['name']
+        with context.session.begin(subtransactions=True):
+            try:
+                router = tnos.TnosRouter(router_id, router_name, self._tn_info['image_path'])
+                self._router.append(router)
+
+            except Exception as e:
+                LOG.error("Failed to create_router router=%(router)s",
+                          {"router": router})
+                resources.Exinfo(e)
+                utils._rollback_on_err(self, context, e)
+        utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
+
+        return super(TNL3ServicePlugin, self).create_router(context, router)
 
     def update_router(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
