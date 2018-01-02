@@ -44,7 +44,7 @@ class TNL3Interface():
 
 class TnosRouter():
 
-    def __init__(self, id, name, image_path):
+    def __init__(self, id, name, image_path='tnos.qcow2'):
         self.driver = None
         self.vm = None
         self.id = id

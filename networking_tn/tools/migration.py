@@ -146,7 +146,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         if port_name is None:
             return
 
-        router = self.get_router(router_id)
+        router = self.get_tn_router(router_id)
 
         if is_gw:
             intf_id = tnos.MANAGE_INTF_ID

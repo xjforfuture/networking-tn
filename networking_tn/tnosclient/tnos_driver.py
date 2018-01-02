@@ -66,7 +66,7 @@ class TNOSvm():
 
     def start(self):
         '''create tnos vm'''
-        LOG.info("%s start" % self.image_name)
+        LOG.info("%s start" % self.image_path)
         cmd = TNOSvm.kvm_cmd + self.image_name
         self.subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
