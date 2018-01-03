@@ -81,4 +81,7 @@ class TnosRouter():
     def add_default_permit_rule(self, **msg):
         self.add_rule(id='1', action='permit', **msg)
 
+    def del_router(self):
+        self.vm.destroy()
+
 

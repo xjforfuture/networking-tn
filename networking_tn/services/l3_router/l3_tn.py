@@ -76,45 +76,10 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
 
-    """
-    def create_router(self, context, router):
-        LOG.debug("create_router: router=%s", router)
-        # Limit one router per tenant
-        if not router.get('router', None):
-            return
-        tenant_id = router['router']['tenant_id']
-        if tn_db.query_count(context, l3_db.Router,
-                                   tenant_id=tenant_id):
-            raise Exception(_("TNL3ServicePlugin:create_router "
-                              "Only support one router per tenant"))
-        with context.session.begin(subtransactions=True):
-            try:
-                namespace = utils.add_vdom(self, context, tenant_id=tenant_id)
-                utils.add_vlink(self, context, namespace.vdom)
-            except Exception as e:
-                with excutils.save_and_reraise_exception():
-                    LOG.error(_LE("Failed to create_router router=%(router)s"),
-                              {"router": router})
-                    utils._rollback_on_err(self, context, e)
-        utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
-        return super(TNL3ServicePlugin, self).\
-            create_router(context, router)
-    """
-
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
         # Limit one router per tenant
         if not router.get('router', None):
-            return
-
-        router_msg = router.get('router', None)
-        if not router_msg:
-            return
-
-        if not router_msg.get('tenant_id', None):
-            return
-
-        if not router_msg.get('name', None):
             return
 
         router_id = router['router']['tenant_id']
@@ -124,8 +89,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         with context.session.begin(subtransactions=True):
             try:
-                router = tnos.TnosRouter(router_id, router_name, self._tn_info["image_path"])
-                self._router.append(router)
+                tn_router = tnos.TnosRouter(router_id, router_name, self._tn_info["image_path"])
+                self._router.append(tn_router)
 
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
@@ -142,40 +107,18 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         return (super(TNL3ServicePlugin, self).
                 update_router(context, id, router))
 
-    '''
     def delete_router(self, context, id):
         LOG.debug("delete_router: router id=%s", id)
         try:
-            if self.enable_fwaas:
-                fw_plugin = directory.get_plugin(p_consts.FIREWALL)
-                fw_plugin.update_firewall_for_delete_router(context, id)
             with db_api.context_manager.writer.using(context):
                 router = tn_db.query_record(context, l3_db.Router, id=id)
-                # TODO(jerryz): move this out of transaction.
                 setattr(context, 'GUARD_TRANSACTION', False)
                 super(TNL3ServicePlugin, self).delete_router(context, id)
                 if getattr(router, 'tenant_id', None):
-                    utils.delete_vlink(self, context, router.tenant_id)
-                    utils.delete_vdom(self, context,
-                                      tenant_id=router.tenant_id)
-        except Exception as e:
-            with excutils.save_and_reraise_exception():
-                LOG.error(_LE("Failed to delete_router routerid=%(id)s"),
-                          {"id": id})
-                resources.Exinfo(e)
-                
-    '''
+                    tn_router = self.get_tn_router(id)
+                    tn_router.del_router()
+                    self._router.pop(tn_router)
 
-    def delete_router(self, context, id):
-        LOG.debug("delete_router: router id=%s", id)
-        try:
-            with db_api.context_manager.writer.using(context):
-                router = tn_db.query_record(context, l3_db.Router, id=id)
-                setattr(context, 'GUARD_TRANSACTION', False)
-                super(TNL3ServicePlugin, self).delete_router(context, id)
-                if getattr(router, 'tenant_id', None):
-                    #todo xiongjun
-                    pass
 
         except Exception as e:
             with excutils.save_and_reraise_exception():

@@ -28,10 +28,10 @@ VIRT_STATE_MAP = ['running',
                   'crashed']
 
 class TNOSvm():
-    kvm_cmd = 'kvm -nographic ' \
-                  + '-device e1000,netdev=eth0 -netdev tap,id=eth0,script=nothing ' \
-                  + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=nothing ' \
-                  + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=nothing '
+    kvm_cmd = 'sudo kvm -nographic ' \
+                  + '-device e1000,netdev=eth0 -netdev tap,id=eth0,script=/opt/stack/tnos/nothing ' \
+                  + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=/opt/stack/tnos/nothing ' \
+                  + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=/opt/stack/tnos/nothing '
     image = 'tnos'
     image_id = 0
     tnosvm = []
@@ -66,8 +66,9 @@ class TNOSvm():
 
     def start(self):
         '''create tnos vm'''
-        LOG.info("%s start" % self.image_path)
+        LOG.debug("%s start" % self.image_name)
         cmd = TNOSvm.kvm_cmd + self.image_name
+        LOG.debug(cmd)
         self.subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
         time.sleep(15)
