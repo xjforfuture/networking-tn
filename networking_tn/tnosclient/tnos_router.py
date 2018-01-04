@@ -44,10 +44,9 @@ class TNL3Interface():
 
 class TnosRouter():
 
-    def __init__(self, id, name, image_path='tnos.qcow2'):
+    def __init__(self, tenant_id, name, image_path='tnos.qcow2'):
         self.driver = None
-        self.vm = None
-        self.id = id
+        self.tenant_id = tenant_id
         self.name = name
         self.vm = create_tnos(name, image_path)
         self.api_client = None
@@ -57,7 +56,7 @@ class TnosRouter():
         for i in range(0, ROUTER_MAX_INTF):
             intf = TNL3Interface('tap' + str(i), 'ethernet' + str(i))
             self.intfs.append(intf)
-            cmd = cmd + 'ifconfig %s up \n' % intf.extern_name
+            cmd = cmd + 'sudo ifconfig %s up \n' % intf.extern_name
             intf.state = 'up'
 
         subprocess.Popen(cmd, shell=True)

@@ -120,11 +120,11 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         if not router.get('router', None):
             return
 
-        router_id = router['router']['id']
+        tenant_id = router['router']['tenant_id']
         router_name = router['router']['name']
         with context.session.begin(subtransactions=True):
             try:
-                router = tnos.TnosRouter(router_id, router_name, self._tn_info['image_path'])
+                router = tnos.TnosRouter(tenant_id, router_name, self._tn_info['image_path'])
                 self._router.append(router)
 
             except Exception as e:

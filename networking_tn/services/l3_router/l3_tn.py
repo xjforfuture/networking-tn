@@ -82,15 +82,15 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         if not router.get('router', None):
             return
 
-        router_id = router['router']['tenant_id']
+        tenant_id = router['router']['tenant_id']
         router_name = router['router']['name']
-
-        LOG.debug("router_id %s, router_name %s" % (router_id, router_name))
 
         with context.session.begin(subtransactions=True):
             try:
-                tn_router = tnos.TnosRouter(router_id, router_name, self._tn_info["image_path"])
+                tn_router = tnos.TnosRouter(tenant_id, router_name, self._tn_info["image_path"])
                 self._router.append(tn_router)
+                for routers in self._router:
+                    LOG.debug(routers.name)
 
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
@@ -115,10 +115,15 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 setattr(context, 'GUARD_TRANSACTION', False)
                 super(TNL3ServicePlugin, self).delete_router(context, id)
                 if getattr(router, 'tenant_id', None):
-                    tn_router = self.get_tn_router(id)
-                    tn_router.del_router()
-                    self._router.pop(tn_router)
+                    router_name = router['name']
 
+                    LOG.debug(router)
+                    tn_router = self.get_tn_router(router_name)
+                    if tn_router is not None:
+                        tn_router.del_router()
+                        self._router.remove(tn_router)
+                    else:
+                        LOG.debug('trace')
 
         except Exception as e:
             with excutils.save_and_reraise_exception():
@@ -127,14 +132,20 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 resources.Exinfo(e)
 
 
-    def get_tn_router(self, router_id):
+    def get_tn_router(self, router_name):
+        LOG.debug('trace')
+        if self._router is None:
+            LOG.debug('self router is none!!!')
+        else:
+            LOG.debug('self router is not none***')
+
         for router in self._router:
-            if router.id == router_id:
+            LOG.debug('%s %s' % (router.name, router_name))
+            if router.name == router_name:
                 return router
 
-
     def add_router_interface(self, context, router_id, interface_info):
-        """creates vlnk on the fortinet device."""
+        """creates interface on the tn device."""
         LOG.debug("TNL3ServicePlugin.add_router_interface: "
                   "router_id=%(router_id)s "
                   "interface_info=%(interface_info)r",

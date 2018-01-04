@@ -23,9 +23,9 @@ from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 
-VIRT_STATE_MAP = ['running',
-                  'shutdown',
-                  'crashed']
+VIRT_STATE_MAP = {'running':'running',
+                  'shutdown':'shutdown',
+                  'crashed':'crashed'}
 
 class TNOSvm():
     kvm_cmd = 'sudo kvm -nographic ' \
@@ -40,6 +40,7 @@ class TNOSvm():
         self.manage_ip = None
         self.subprocess = None
         self.vmname = vmname
+        self.state = None
 
         TNOSvm.image_id += 1
         self.image_name = TNOSvm.image + str(TNOSvm.image_id)
@@ -49,8 +50,11 @@ class TNOSvm():
         image_path = '/'.join(image_path)
 
         self.image_name = image_path
-        copyfile(source_image, image_path)
+
+        #copyfile(source_image, image_path)
+        cmd = 'sudo cp ' + source_image + ' ' + image_path
         LOG.debug("copy file :%s to %s" % (source_image, self.image_name))
+        subprocess.call(cmd, shell=True)
 
         TNOSvm.tnosvm.append(self)
 
@@ -63,7 +67,6 @@ class TNOSvm():
                 return vm
         return None
 
-
     def start(self):
         '''create tnos vm'''
         LOG.debug("%s start" % self.image_name)
@@ -72,38 +75,53 @@ class TNOSvm():
         self.subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
         time.sleep(15)
+
         for i in range(1024):
             message = self.subprocess.stdout.readline()
             if 'Username' in message:
                 break
 
         if i+1 == 1024:
-            self.state = VIRT_STATE_MAP[2]
+            self.state = VIRT_STATE_MAP['crashed']
             return False
         else:
-            self.state = VIRT_STATE_MAP[0]
+            self.state = VIRT_STATE_MAP['running']
             return True
 
 
     def stop(self):
         try:
-            os.kill(self.subprocess.pid+1, signal.SIGKILL)
-            self.state = VIRT_STATE_MAP[1]
-            LOG.info("%s stop" % self.vmname)
+            cmd = 'sudo kill ' + str(self.subprocess.pid+2)
+            #cmd = 'sudo killall qemu-system-x86_64'
+            LOG.debug("exec cmd: %s" % cmd)
+            subprocess.call(cmd, shell=True)
+
+            cmd = 'sudo kill ' + str(self.subprocess.pid+1)
+
+            LOG.debug("exec cmd: %s" % cmd)
+            subprocess.call(cmd, shell=True)
+
+            #os.kill(self.subprocess.pid+1, signal.SIGKILL)
+            self.state = VIRT_STATE_MAP['shutdown']
+
         except OSError, e:
             LOG.info("%s stop error" % self.vmname)
 
     def destroy(self):
-        self.stop()
-        os.remove(self.image_name)
-        LOG.info("Destroy %s" % self.vmname)
+        if self.is_running():
+            self.stop()
 
-        for vm in TNOSvm.tnosvm:
-            if vm is self:
-                TNOSvm.tnosvm.pop(vm)
+        cmd = 'sudo rm ' + self.image_name
+        subprocess.call(cmd, shell=True)
+        LOG.debug("Destroy %s" % self.vmname)
+
+        TNOSvm.tnosvm.remove(self)
 
     def is_running(self):
-        return self.state
+        if self.state == VIRT_STATE_MAP['running']:
+            return True
+        else:
+            return False
 
     def login(self, username='admin', passward='admin'):
         self.subprocess.stdin.write(username+'\n')
