@@ -109,7 +109,6 @@ class Fake_context(object):
 class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def __init__(self):
         self._tn_info = None
-        self._router = []
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
@@ -125,7 +124,6 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         with context.session.begin(subtransactions=True):
             try:
                 router = tnos.TnosRouter(tenant_id, router_name, self._tn_info['image_path'])
-                self._router.append(router)
 
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
@@ -146,7 +144,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         if port_name is None:
             return
 
-        router = self.get_tn_router(router_id)
+        router = tnos.TnosRouter.get_tn_router(router_id)
 
         if is_gw:
             intf_id = tnos.MANAGE_INTF_ID
@@ -174,7 +172,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
             intf.status = True
 
             router.vm.config_intf_ip(intf_id, ip, mask)
-            ovsdb.add_port(l3_tn.INT_BRIDGE_NAME, intf.extern_name)
+            ovsdb.add_port(tnos.INT_BRIDGE_NAME, intf.extern_name)
             ovsdb.add_port_tag(intf.extern_name, tag)
 
             if is_gw:

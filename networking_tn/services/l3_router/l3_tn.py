@@ -30,6 +30,7 @@ from neutron.db import api as db_api
 from neutron.db.models import l3 as l3_db
 from neutron.plugins.ml2 import db
 from neutron.services.l3_router import l3_router_plugin as router
+from neutron.db import l3_db as neu_l3_db
 
 from networking_tn._i18n import _, _LE
 from networking_tn.common import config
@@ -49,7 +50,6 @@ DEVICE_OWNER_ROUTER_INTF = l3_constants.DEVICE_OWNER_ROUTER_INTF
 DEVICE_OWNER_ROUTER_GW = l3_constants.DEVICE_OWNER_ROUTER_GW
 DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 
-INT_BRIDGE_NAME = 'br-int'
 
 LOG = logging.getLogger(__name__)
 
@@ -62,7 +62,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         """Initialize Fortinet L3 service Plugin."""
         super(TNL3ServicePlugin, self).__init__()
         self._tn_info = None
-        self._router = []
         #self._driver = None
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
@@ -88,9 +87,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         with context.session.begin(subtransactions=True):
             try:
                 tn_router = tnos.TnosRouter(tenant_id, router_name, self._tn_info["image_path"])
-                self._router.append(tn_router)
-                for routers in self._router:
-                    LOG.debug(routers.name)
 
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
@@ -99,7 +95,13 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 utils._rollback_on_err(self, context, e)
         utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
 
-        return super(TNL3ServicePlugin, self).create_router(context, router)
+        rlt = super(TNL3ServicePlugin, self).create_router(context, router)
+
+        router = tn_db.query_record(context, l3_db.Router, name=router_name)
+        tn_router.id = router['id']
+        LOG.debug(tn_router.id)
+
+        return rlt
 
     def update_router(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
@@ -118,10 +120,9 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                     router_name = router['name']
 
                     LOG.debug(router)
-                    tn_router = self.get_tn_router(router_name)
+                    tn_router = tnos.TnosRouter.get_tn_router(router_name=router_name)
                     if tn_router is not None:
                         tn_router.del_router()
-                        self._router.remove(tn_router)
                     else:
                         LOG.debug('trace')
 
@@ -130,19 +131,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 LOG.error(_LE("Failed to delete_router routerid=%(id)s"),
                           {"id": id})
                 resources.Exinfo(e)
-
-
-    def get_tn_router(self, router_name):
-        LOG.debug('trace')
-        if self._router is None:
-            LOG.debug('self router is none!!!')
-        else:
-            LOG.debug('self router is not none***')
-
-        for router in self._router:
-            LOG.debug('%s %s' % (router.name, router_name))
-            if router.name == router_name:
-                return router
 
     def add_router_interface(self, context, router_id, interface_info):
         """creates interface on the tn device."""
@@ -179,20 +167,15 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 raise Exception(_("TNL3ServicePlugin:adding redundant "
                                   "router interface is not supported"))
             try:
-                db_namespace = tn_db.query_record(context,
-                                        tn_db.Fortinet_ML2_Namespace,
-                                        tenant_id=tenant_id)
-                vlan_inf = utils.get_intf(context, network_id)
-                int_intf, ext_intf = utils.get_vlink_intf(self, context,
-                                               vdom=db_namespace.vdom)
-                utils.add_fwpolicy(self, context,
-                                   vdom=db_namespace.vdom,
-                                   srcintf=vlan_inf,
-                                   dstintf=int_intf,
-                                   nat='enable')
+                tn_router = tnos.TnosRouter.get_tn_router(router_id=router_id)
+
+                if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_INTF]:
+                    tn_router.add_intf(port, True)
+                else:
+                    tn_router.add_intf(port, False)
 
             except Exception as e:
-                LOG.error(_LE("Failed to create Fortinet resources to add "
+                LOG.error(_LE("Failed to create TN resources to add "
                             "router interface. info=%(info)s, "
                             "router_id=%(router_id)s"),
                           {"info": info, "router_id": router_id})
@@ -212,27 +195,21 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         with context.session.begin(subtransactions=True):
             # TODO(jerryz): move this out of transaction.
             setattr(context, 'GUARD_TRANSACTION', False)
-            info = (super(TNL3ServicePlugin, self).
-                    remove_router_interface(context, router_id,
-                                            interface_info))
+            info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
+            '''
             try:
                 subnet = self._core_plugin._get_subnet(context,
                                                        info['subnet_id'])
                 tenant_id = subnet['tenant_id']
                 network_id = subnet['network_id']
-                vlan_inf = utils.get_intf(context, network_id)
-                db_namespace = tn_db.query_record(context,
-                                        tn_db.Fortinet_ML2_Namespace,
-                                        tenant_id=tenant_id)
-                utils.delete_fwpolicy(self, context,
-                                      vdom=db_namespace.vdom,
-                                      srcintf=vlan_inf)
+
             except Exception:
                 with excutils.save_and_reraise_exception():
                     LOG.error(_LE("Fail remove of interface from Fortigate "
                                   "router interface. info=%(info)s, "
                                   "router_id=%(router_id)s"),
                              {"info": info, "router_id": router_id})
+            '''
         return info
 
     def create_floatingip(self, context, floatingip):
@@ -437,11 +414,12 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             {'tenant_id': subnet['tenant_id'],
              'network_id': subnet['network_id'],
              'fixed_ips': [fixed_ip],
-             'mac_address': utils.get_mac(self, context),
+             'mac_address': None,
              'admin_state_up': True,
              'device_id': router.id,
              'device_owner': owner,
              'name': ''}}), [subnet], True)
+
 
     def _allocate_floatingip(self, context, obj):
         """

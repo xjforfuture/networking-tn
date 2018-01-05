@@ -140,6 +140,7 @@ class TNOSvm():
         self.subprocess.stdin.write('zone trust \n')
         cmd = 'ip address '+ ip + ' ' + mask +'\n'
         self.subprocess.stdin.write(cmd)
+        LOG.debug('exec cmd (%s) from stdin' % (cmd))
 
     def enable_ping(self, intf_id):
         self.into_interface(intf_id)
