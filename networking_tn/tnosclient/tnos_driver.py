@@ -74,7 +74,7 @@ class TNOSvm():
         LOG.debug(cmd)
         self.subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
-        time.sleep(15)
+        #time.sleep(15)
 
         for i in range(1024):
             message = self.subprocess.stdout.readline()

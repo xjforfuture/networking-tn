@@ -198,6 +198,29 @@ class DBbase(object):
         return rollback
 
 
+
+class Tn_Router_Db(model_base.BASEV2, DBbase):
+    """Schema for tn network."""
+    name = sa.Column(sa.String(64), primary_key=True)
+    id = sa.Column(sa.String(32), primary_key=True)
+    tenant_id = sa.Column(sa.String(32))
+    '''
+    @classmethod
+    def add_record(cls, context, **kwargs):
+        res = super(Tn_Router, cls).add_record(context, **kwargs)
+        if res.get('rollback'):
+            res['result']._allocate_vdom(context, res['result'])
+        return res
+
+    def _allocate_vdom(self, context, record):
+        if not getattr(record, 'vdom'):
+            vdom = const.PREFIX['vdom'] + str(record.id)
+            self.update_record(context, record, vdom=vdom)
+        return record.vdom
+        
+    '''
+
+#####################################
 class Fortinet_ML2_Namespace(model_base.BASEV2, DBbase):
     """Schema for Fortinet network."""
     #__tablename__ = 'Fortinet_ML2_Namespace'

@@ -50,7 +50,7 @@ class TNL3Interface():
 
 class TnosRouter():
 
-    tn_router = []
+    tnos_router_list = []
 
     def __init__(self, tenant_id, name, image_path='tnos.qcow2'):
         self.driver = None
@@ -59,7 +59,9 @@ class TnosRouter():
         self.name = name
         self.vm = create_tnos(name, image_path)
         self.api_client = None
-        TnosRouter.tn_router.append(self)
+
+        TnosRouter.tnos_router_list.append(self)
+        LOG.debug('*** tn_router number %d' % len(TnosRouter.tnos_router_list))
 
         self.intfs = []
         cmd = ''
@@ -73,12 +75,19 @@ class TnosRouter():
 
     @staticmethod
     def get_tn_router(router_id=None, router_name=None):
-        for tn_router in TnosRouter.tn_router:
-            LOG.debug('%s %s' % (tn_router.name, router_name))
-            if router_name and tn_router.name == router_name:
-                return tn_router
-            if router_id and tn_router.id == router_id:
-                return tn_router
+
+        LOG.debug('*** tn_router number %d' % len(TnosRouter.tnos_router_list))
+        for tn_router in TnosRouter.tnos_router_list:
+            if tn_router is not None:
+                LOG.debug('%s %s' % (tn_router.name, router_name))
+                if router_name and tn_router.name == router_name:
+                    return tn_router
+                if router_id and tn_router.id == router_id:
+                    return tn_router
+
+    def del_router(self):
+        self.vm.destroy()
+        TnosRouter.tnos_router_list.remove(self)
 
     def set_restful_api_client(self, client):
         self.api_client = client
@@ -157,10 +166,5 @@ class TnosRouter():
 
     def add_default_permit_rule(self, **msg):
         self.add_rule(id='1', action='permit', **msg)
-
-    def del_router(self):
-        self.vm.destroy()
-        TnosRouter.tn_router.remove(self)
-
 
 

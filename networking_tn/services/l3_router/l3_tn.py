@@ -84,10 +84,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         tenant_id = router['router']['tenant_id']
         router_name = router['router']['name']
 
+        res = None
         with context.session.begin(subtransactions=True):
             try:
                 tn_router = tnos.TnosRouter(tenant_id, router_name, self._tn_info["image_path"])
-
+                res = tn_db.Tn_Router_Db.add_record(context, name=router_name, tenant_id=tenant_id)
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
                           {"router": router})
@@ -101,13 +102,15 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         tn_router.id = router['id']
         LOG.debug(tn_router.id)
 
+        if res is not None:
+            tn_db.Tn_Router_Db.update_record(context, res['result'], id=router['id'])
+
         return rlt
 
     def update_router(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
                   {'id': id, 'router': router})
-        return (super(TNL3ServicePlugin, self).
-                update_router(context, id, router))
+        return (super(TNL3ServicePlugin, self).update_router(context, id, router))
 
     def delete_router(self, context, id):
         LOG.debug("delete_router: router id=%s", id)
@@ -121,6 +124,10 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
                     LOG.debug(router)
                     tn_router = tnos.TnosRouter.get_tn_router(router_name=router_name)
+
+                    tn_router_db = tn_db.query_record(context, tn_db.Tn_Router_Db, name=router_name)
+                    LOG.debug(tn_router_db['name'], tn_router_db['id'], tn_router_db['tenant_id'])
+
                     if tn_router is not None:
                         tn_router.del_router()
                     else:
@@ -150,8 +157,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                       "info=%(info)r",
                       {'context': context, 'port': port, 'info': info})
             interface_info = info
-            subnet = self._core_plugin._get_subnet(context,
-                                                   interface_info['subnet_id'])
+            subnet = self._core_plugin._get_subnet(context,interface_info['subnet_id'])
             network_id = subnet['network_id']
             tenant_id = port['tenant_id']
             port_filters = {'network_id': [network_id],
