@@ -66,6 +66,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
+        self.tn_router_list = []
 
     def tn_init(self):
         """Fortinet specific initialization for this class."""
@@ -88,7 +89,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         with context.session.begin(subtransactions=True):
             try:
                 tn_router = tnos.TnosRouter(tenant_id, router_name, self._tn_info["image_path"])
-                res = tn_db.Tn_Router_Db.add_record(context, name=router_name, tenant_id=tenant_id)
+                self.tn_router_list.append(tn_router)
+
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
                           {"router": router})
@@ -101,9 +103,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         router = tn_db.query_record(context, l3_db.Router, name=router_name)
         tn_router.id = router['id']
         LOG.debug(tn_router.id)
-
-        if res is not None:
-            tn_db.Tn_Router_Db.update_record(context, res['result'], id=router['id'])
 
         return rlt
 
@@ -123,13 +122,12 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                     router_name = router['name']
 
                     LOG.debug(router)
-                    tn_router = tnos.TnosRouter.get_tn_router(router_name=router_name)
-
-                    tn_router_db = tn_db.query_record(context, tn_db.Tn_Router_Db, name=router_name)
-                    LOG.debug(tn_router_db['name'], tn_router_db['id'], tn_router_db['tenant_id'])
+                    #tn_router = tnos.TnosRouter.get_tn_router(router_name=router_name)
+                    tn_router = self.get_tn_router(router_name=router_name)
 
                     if tn_router is not None:
-                        tn_router.del_router()
+                        self.tn_router_list.remove(tn_router)
+                        #tn_router.del_router()
                     else:
                         LOG.debug('trace')
 
@@ -138,6 +136,17 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 LOG.error(_LE("Failed to delete_router routerid=%(id)s"),
                           {"id": id})
                 resources.Exinfo(e)
+
+    def get_tn_router(self, router_id=None, router_name=None):
+
+        LOG.debug('*** tn_router number %d' % len(self.tnos_router_list))
+        for tn_router in self.tnos_router_list:
+            if tn_router is not None:
+                LOG.debug('%s %s' % (tn_router.name, router_name))
+                if router_name and tn_router.name == router_name:
+                    return tn_router
+                if router_id and tn_router.id == router_id:
+                    return tn_router
 
     def add_router_interface(self, context, router_id, interface_info):
         """creates interface on the tn device."""
