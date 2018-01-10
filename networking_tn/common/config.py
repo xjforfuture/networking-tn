@@ -22,13 +22,13 @@ ML2_TN = [
                help=_('TNOS image path')),
     cfg.StrOpt('address', default='',
                help=_('The address of fortigates to connect to')),
-    cfg.StrOpt('port', default='443',
+    cfg.StrOpt('port', default='80',
                help=_('The FGT port to serve API requests')),
-    cfg.StrOpt('protocol', default='https',
-               help=_('The FGT uses which protocol: http or https')),
+    cfg.StrOpt('protocol', default='http',
+               help=_('The tsinghuanet uses which protocol: http or https')),
     cfg.StrOpt('username', default='admin',
                help=_('The username used to login')),
-    cfg.StrOpt('password', default='password', secret=True,
+    cfg.StrOpt('password', default='admin', secret=True,
                help=_('The password used to login')),
     cfg.StrOpt('int_interface', default='internal',
                help=_('The interface to serve tenant network')),
@@ -94,8 +94,12 @@ tn_info = {
 
 def get_apiclient(address=None):
     """Fortinet api client initialization."""
+    #api_server = [(address if address else tn_info['address'], tn_info['port'],
+    #              'https' == tn_info['protocol'])]
+
     api_server = [(address if address else tn_info['address'], tn_info['port'],
-                  'https' == tn_info['protocol'])]
+                   'https' == tn_info['protocol'])]
+
     return client.FortiosApiClient(
         api_server, tn_info['username'], tn_info['password'])
 

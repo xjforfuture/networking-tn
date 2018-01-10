@@ -28,22 +28,26 @@ VIRT_STATE_MAP = {'running':'running',
                   'crashed':'crashed'}
 
 class TNOSvm():
+    '''
     kvm_cmd = 'sudo kvm -nographic ' \
                   + '-device e1000,netdev=eth0 -netdev tap,id=eth0,script=/opt/stack/tnos/nothing ' \
                   + '-device e1000,netdev=eth1 -netdev tap,id=eth1,script=/opt/stack/tnos/nothing ' \
                   + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=/opt/stack/tnos/nothing '
+    '''
+
+    kvm_cmd = 'kvm -nographic -net tap,ifname=%(tap0)s,script=no -net nic ' \
+              +'-net tap,ifname=%(tap1)s,script=no -net nic ' \
+              +'-net tap,ifname=%(tap2)s,script=no -net nic %(image_path)s'
+
     image = 'tnos'
-    image_id = 0
-    tnosvm = []
 
     def __init__(self, vmname, source_image):
-        self.manage_ip = None
-        self.subprocess = None
         self.vmname = vmname
-        self.state = None
+        self.state = VIRT_STATE_MAP['shutdown']
+        self.shell_pid = None
+        self.vm_pid = None
 
-        TNOSvm.image_id += 1
-        self.image_name = TNOSvm.image + str(TNOSvm.image_id)
+        self.image_name = TNOSvm.image + vmname
         image_path = source_image.split('/')
         self.image_name = self.image_name + '.' + image_path[-1].split('.')[-1]
         image_path[-1] = self.image_name
@@ -56,47 +60,44 @@ class TNOSvm():
         LOG.debug("copy file :%s to %s" % (source_image, self.image_name))
         subprocess.call(cmd, shell=True)
 
-        TNOSvm.tnosvm.append(self)
-
         LOG.debug("%s init" % self.vmname)
 
-    @staticmethod
-    def get(vmname):
-        for vm in TNOSvm.tnosvm:
-            if vm.vmname == vmname:
-                return vm
-        return None
 
-    def start(self):
+    def start(self, manage_intf, manage_ip):
         '''create tnos vm'''
-        LOG.debug("%s start" % self.image_name)
-        cmd = TNOSvm.kvm_cmd + self.image_name
-        LOG.debug(cmd)
-        self.subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
-        #time.sleep(15)
+        cmd = TNOSvm.kvm_cmd % {'tap0':'tap0-'+self.vmname, 'tap1':'tap1-'+self.vmname,
+                                'tap2':'tap2-'+self.vmname, 'image_path':self.image_name}
+        LOG.debug(cmd)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
         for i in range(1024):
-            message = self.subprocess.stdout.readline()
+            message = proc.stdout.readline()
             if 'Username' in message:
                 break
 
         if i+1 == 1024:
             self.state = VIRT_STATE_MAP['crashed']
-            return False
+
         else:
             self.state = VIRT_STATE_MAP['running']
-            return True
+            self.shell_pid = proc.pid + 1
+            self.vm_pid = proc.pid + 2
 
+            self.config_intf_ip(proc, manage_intf, manage_ip, '255.255.255.0')
+            self.enable_http(proc, manage_intf)
+            self.enable_https(proc, manage_intf)
+            self.enable_ping(proc, manage_intf)
+            self.enable_telnet(proc, manage_intf)
 
     def stop(self):
         try:
-            cmd = 'sudo kill ' + str(self.subprocess.pid+2)
+            cmd = 'sudo kill ' + str(self.vm_pid)
             #cmd = 'sudo killall qemu-system-x86_64'
             LOG.debug("exec cmd: %s" % cmd)
             subprocess.call(cmd, shell=True)
 
-            cmd = 'sudo kill ' + str(self.subprocess.pid+1)
+            cmd = 'sudo kill ' + str(self.shell_pid)
 
             LOG.debug("exec cmd: %s" % cmd)
             subprocess.call(cmd, shell=True)
@@ -115,67 +116,53 @@ class TNOSvm():
         subprocess.call(cmd, shell=True)
         LOG.debug("Destroy %s" % self.vmname)
 
-        TNOSvm.tnosvm.remove(self)
-
     def is_running(self):
         if self.state == VIRT_STATE_MAP['running']:
             return True
         else:
             return False
 
-    def login(self, username='admin', passward='admin'):
-        self.subprocess.stdin.write(username+'\n')
-        self.subprocess.stdin.write(passward+'\n')
+    def login(self, subprocess, username='admin', passward='admin'):
+        subprocess.stdin.write(username+'\n')
+        subprocess.stdin.write(passward+'\n')
 
-    def into_interface(self, intf_id):
-        self.login()
-        self.subprocess.stdin.write('end\n')
-        self.subprocess.stdin.write('enable\n')
-        self.subprocess.stdin.write('config\n')
-        self.subprocess.stdin.write('interface ethernet'+ str(intf_id) + '\n')
+    def into_interface(self, subprocess, intf_id):
+        self.login(subprocess)
+        subprocess.stdin.write('end\n')
+        subprocess.stdin.write('enable\n')
+        subprocess.stdin.write('config\n')
+        subprocess.stdin.write('interface ethernet'+ str(intf_id) + '\n')
 
-    def config_intf_ip(self, intf_id, ip, mask):
-        self.into_interface(intf_id)
+    def config_intf_ip(self, subprocess, intf_id, ip, mask):
+        self.into_interface(subprocess, intf_id)
 
-        self.subprocess.stdin.write('zone trust \n')
+        subprocess.stdin.write('zone trust \n')
         cmd = 'ip address '+ ip + ' ' + mask +'\n'
-        self.subprocess.stdin.write(cmd)
+        subprocess.stdin.write(cmd)
         LOG.debug('exec cmd (%s) from stdin' % (cmd))
 
-    def enable_ping(self, intf_id):
-        self.into_interface(intf_id)
-        self.subprocess.stdin.write('manage ping\n')
+    def enable_ping(self, subprocess, intf_id):
+        self.into_interface(subprocess, intf_id)
+        subprocess.stdin.write('manage ping\n')
 
-        #for debug
-        self.into_interface(1)
-        self.subprocess.stdin.write('zone trust \n')
-        self.subprocess.stdin.write('manage ping\n')
+    def enable_http(self, subprocess, intf_id):
+        self.into_interface(subprocess, intf_id)
+        subprocess.stdin.write('manage http\n')
 
-        self.into_interface(2)
-        self.subprocess.stdin.write('zone trust \n')
-        cmd = 'ip address 90.1.1.1/24\n'
-        self.subprocess.stdin.write(cmd)
-        self.subprocess.stdin.write('manage ping\n')
-        self.subprocess.stdin.write('manage telnet\n')
+    def enable_https(self, subprocess, intf_id):
+        self.into_interface(subprocess, intf_id)
+        subprocess.stdin.write('manage https\n')
 
-    def enable_http(self, intf_id):
-        self.into_interface(intf_id)
-        self.subprocess.stdin.write('manage http\n')
+    def enable_telnet(self, subprocess, intf_id):
+        self.into_interface(subprocess, intf_id)
+        subprocess.stdin.write('manage telnet\n')
 
-    def enable_https(self, intf_id):
-        self.into_interface(intf_id)
-        self.subprocess.stdin.write('manage https\n')
-
-    def enable_telnet(self, intf_id):
-        self.into_interface(intf_id)
-        self.subprocess.stdin.write('manage telnet\n')
-
-    def display_config(self, line_num=1024):
+    def display_config(self, subprocess, line_num=1024):
         flag = True
-        self.subprocess.stdin.write('show running-config\n')
+        subprocess.stdin.write('show running-config\n')
         while line_num:
             line_num = line_num - 1
-            message = self.subprocess.stdout.readline()
+            message = subprocess.stdout.readline()
             if 'show running-config' in message:
                 flag = True
             if flag:

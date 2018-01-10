@@ -202,7 +202,7 @@ class DBbase(object):
 class Tn_Router_Db(model_base.BASEV2, DBbase):
     """Schema for tn network."""
     name = sa.Column(sa.String(64), primary_key=True)
-    id = sa.Column(sa.String(32), primary_key=True)
+    id = sa.Column(sa.String(32))
     tenant_id = sa.Column(sa.String(32))
     '''
     @classmethod
