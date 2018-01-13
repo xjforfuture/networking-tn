@@ -50,6 +50,51 @@ TOUCH = """
 }
 """
 
+GET_INTF_INFO = """
+{
+    "path": "/api/system_interface?vdom=root",
+    "method": "GET"
+}
+"""
+
+CFG_INTF = """
+{
+    "path": "/api/system_interface/{{ intf_name }}?vdom=root",
+    "method": "PUT",
+    "body": {
+            "mode": "static",
+            "binding_zone": "l3zone",
+            "zone_l3": "trust",
+            "allowaccess": [],
+            "_id": "{{ intf_name }}",
+            
+            {% if dns_state is defined %}
+                "enableDNSproxy": "{{ dns_state }}",
+            {% else %}
+                "enableDNSproxy": "disable",
+            {% endif %} 
+            
+            {% if mtu is defined %}
+                "mtu": "{{ mtu }}",
+            {% else %}
+                "mtu": "1500",
+            {% endif %} 
+            
+            {% if vlan is defined %}
+                "vlan": "{{ vlan }}",
+            {% else %}
+                "vlan": " ",
+            {% endif %} 
+            
+            "interface":"ethernet0",
+            "type": "{{ type }}",
+            "ip": "{{ ip_prefix }}",
+            "mkey": "{{ intf_name }}",
+            "mkey_id": "{{ id }}"
+    }
+}
+"""
+
 ADD_STATIC_ROUTE = """
 {
     "path": "/api/router_static?vdom=root",
@@ -100,6 +145,16 @@ ADD_ADDRESS_ENTRY = """
             "ip-max": "{{ ip_max }}"
         {% endif %}
             
+    }
+}
+"""
+
+DEL_ADDRESS_ENTRY = """
+{
+    "path": "/api/system_address?vdom=root",
+    "method": "DELETE",
+    "body": {
+        "mkey": "{{ name }}"
     }
 }
 """

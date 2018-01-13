@@ -1,12 +1,11 @@
-from oslo_config import cfg
+
 from ovsdbapp.backend.ovs_idl import connection
 from ovsdbapp.schema.open_vswitch import impl_idl
 from ovsdbapp import constants
+from oslo_log import log as logging
 
-from debtcollector import moves
 from ovs.db import idl
 from ovsdbapp.backend.ovs_idl import idlutils
-import tenacity
 
 '''
 from neutron.agent.ovsdb.native import helpers
@@ -16,6 +15,8 @@ TransactionQueue = moves.moved_class(connection.TransactionQueue,
 moves.moved_class(connection.Connection, 'Connection', __name__)
 '''
 
+LOGG = logging.getLogger(__name__)
+
 _connection = None
 
 def idl_factory():
@@ -23,7 +24,6 @@ def idl_factory():
     schema_name = 'Open_vSwitch'
     helper = idlutils.get_schema_helper(conn, schema_name)
 
-    print('step0')
     '''
     try:
         helper = idlutils.get_schema_helper(conn, schema_name)
@@ -61,7 +61,12 @@ def api_factory():
 
 class OvsCtlBlock():
     def __init__(self):
+
+        LOGG.debug('trace')
+        LOGG.info('trace')
         self.ovs_db = api_factory()
+        if self.ovs_db != None:
+            LOGG.debug('trace')
 
     def add_port(self, bridge_name, port_name):
         with self.ovs_db.transaction() as txn:
@@ -101,15 +106,19 @@ class OvsCtlBlock():
 
     def get_port_tag(self, port_name):
 
+        LOGG.debug('trace')
         port_info = self.ovs_db.db_list("Port", None, columns=["name", "tag", "other_config"],
                                         if_exists=True).execute(check_error=True, log_errors=True)
-        # todo xiongjun.  router interface name must be rename
-        info = [x for x in port_info if len(x['name'])>10]
-        for cur_info in info:
+
+        LOGG.debug('trace', len(port_info))
+
+
+        for cur_info in port_info:
+            LOGG.debug(cur_info['name'], port_name)
             if cur_info['name'][3:13] in port_name:
                 return (cur_info['name'], cur_info['tag'])
 
-        return (None, None)
+        return ('nothing', None)
 
     def conf_list(self):
         port_info = self.ovs_db.db_list("Port", None, columns=["name", "tag", "other_config"],

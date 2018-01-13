@@ -16,7 +16,7 @@
 
 
 """Implentation of FortiOS service Plugin."""
-import subprocess
+
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import excutils
@@ -25,6 +25,7 @@ from neutron_lib import constants as l3_constants
 from neutron_lib import exceptions as n_exc
 from neutron_lib.plugins import constants as p_consts
 from neutron_lib.plugins import directory
+from neutron.plugins.common import utils as p_utils
 
 from neutron.db import api as db_api
 from neutron.db.models import l3 as l3_db
@@ -50,8 +51,10 @@ DEVICE_OWNER_ROUTER_INTF = l3_constants.DEVICE_OWNER_ROUTER_INTF
 DEVICE_OWNER_ROUTER_GW = l3_constants.DEVICE_OWNER_ROUTER_GW
 DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 
-
 LOG = logging.getLogger(__name__)
+
+def neutron_to_tnos(id):
+    return id[:16]
 
 
 class TNL3ServicePlugin(router.L3RouterPlugin):
@@ -67,7 +70,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
-        self.client = {}
+        self.clients = {}
 
     def tn_init(self):
         """Fortinet specific initialization for this class."""
@@ -76,6 +79,16 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         #self._driver = config.get_apiclient()
 
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
+
+    def get_tn_client(self, router_id):
+
+        if self.clients.has_key(router_id):
+            return self.clients[router_id]
+
+        tn_router = tnos.get_tn_router(router_id)
+        self.clients[router_id] = config.get_apiclient(tn_router.manage_ip)
+
+        return self.clients[router_id]
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -86,18 +99,23 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         tenant_id = router['router']['tenant_id']
         router_name = router['router']['name']
 
+        rlt = super(TNL3ServicePlugin, self).create_router(context, router)
+
+        router_db = tn_db.query_record(context, l3_db.Router, name=router_name, tenant_id=tenant_id)
+        LOG.debug(router_db)
+        router_id = router_db['id']
         with context.session.begin(subtransactions=True):
             try:
-                tn_router = tnos.TnosRouter(tenant_id, router_name, self._tn_info["image_path"], self._tn_info['address'])
-                self.client[tn_router.manage_ip] = config.get_apiclient(tn_router.manage_ip)
+                tn_router = tnos.TnosRouter(router_id, tenant_id, router_name, self._tn_info["image_path"], self._tn_info['address'])
+                self.clients[router_id] = config.get_apiclient(tn_router.manage_ip)
+                tn_router.get_intf_info(self.clients[router_id])
+                tn_router.store_router()
                 #router_db = tn_db.Tn_Router_Db.add_record(context, id=router_name, name=router_name, tenant_id=tenant_id)
 
             except Exception as e:
                 LOG.error("Failed to create_router router=%(router)s",
                           {"router": router})
                 resources.Exinfo(e)
-
-        rlt = super(TNL3ServicePlugin, self).create_router(context, router)
 
         #router = tn_db.query_record(context, l3_db.Router, name=router_name)
         #tn_router.id = router['id']
@@ -124,15 +142,14 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                     tenant_id = router['tenant_id']
 
                     LOG.debug(router)
-                    #tn_router = tnos.TnosRouter.get_tn_router(router_name=router_name)
-                    tn_router = tnos.get_tn_router(tenant_id=tenant_id ,router_name=router_name)
+                    #tn_router = tnos.get_tn_router(router_name=router_name)
+                    tn_router = tnos.get_tn_router(router['id'])
                     #tn_router_db = tn_db.query_record(context, tn_db.Tn_Router_Db, name=router_name)
                     #LOG.debug('id %s , name %s, tenant_id %s', tn_router_db.id, tn_router_db.name, tn_router_db.tenant_id)
 
                     if tn_router is not None:
                         tn_router.del_router()
-                    else:
-                        LOG.debug('trace')
+
 
         except Exception as e:
             with excutils.save_and_reraise_exception():
@@ -146,6 +163,21 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                   "router_id=%(router_id)s "
                   "interface_info=%(interface_info)r",
                   {'router_id': router_id, 'interface_info': interface_info})
+
+        tn_router = tnos.get_tn_router(router_id=router_id)
+        if tn_router == None:
+            LOG.debug('tn_router is none')
+
+        client = self.get_tn_client(router_id)
+
+        if client == None:
+            LOG.debug('client is none')
+
+        tn_intf = tn_router.add_intf()
+        tn_intf.subnet_id = interface_info['subnet_id']
+
+        tn_router.store_router()
+
         with context.session.begin(subtransactions=True):
             info = super(TNL3ServicePlugin, self).add_router_interface(
                 context, router_id, interface_info)
@@ -174,23 +206,26 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 raise Exception(_("TNL3ServicePlugin:adding redundant "
                                   "router interface is not supported"))
             try:
-                tn_router = tnos.TnosRouter.get_tn_router(router_id=router_id)
+                tn_intf.extern_id = port['id']
+                tn_router.cfg_intf_ip(client, tn_intf, subnet['gateway_ip']+'/24')
 
-                if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_INTF]:
-                    tn_router.add_intf(port, True)
+                addr_name = neutron_to_tnos(tn_intf.extern_id)
+                if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_GW]:
+                    tn_intf.is_gw = True
+                    tn_router.add_address_entry(client, addr_name, subnet['gateway_ip']+'/32')
                 else:
-                    tn_router.add_intf(port, False)
+                    tn_router.add_address_entry(client, addr_name, subnet['gateway_ip']+'/24')
+                tn_router.store_router()
 
             except Exception as e:
                 LOG.error(_LE("Failed to create TN resources to add "
                             "router interface. info=%(info)s, "
                             "router_id=%(router_id)s"),
                           {"info": info, "router_id": router_id})
-                utils._rollback_on_err(self, context, e)
+
                 with excutils.save_and_reraise_exception():
                     self.remove_router_interface(context, router_id,
                                                  interface_info)
-        utils.update_status(self, context, t_consts.TaskStatus.COMPLETED)
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):
@@ -203,6 +238,17 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             # TODO(jerryz): move this out of transaction.
             setattr(context, 'GUARD_TRANSACTION', False)
             info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
+
+            tn_router = tnos.get_tn_router(router_id=router_id)
+            client = self.get_tn_client(router_id)
+
+
+            tn_intf = tn_router.get_intf_by_extern_id(interface_info['port_id'])
+            addr_name = neutron_to_tnos(tn_intf.extern_id)
+            tn_router.del_address_entry(client, addr_name)
+            tn_router.del_intf(client, tn_intf)
+            tn_router.store_router()
+
             '''
             try:
                 subnet = self._core_plugin._get_subnet(context,
@@ -401,6 +447,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                                     port_id,
                                                     do_notify=do_notify)
 
+
     def _add_interface_by_subnet(self, context, router, subnet_id, owner):
         LOG.debug("_add_interface_by_subnet(): router=%(router)s, "
                   "subnet_id=%(subnet_id)s, owner=%(owner)s",
@@ -414,6 +461,10 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                            [subnet])
         fixed_ip = {'ip_address': subnet['gateway_ip'],
                     'subnet_id': subnet['id']}
+
+        tn_router = tnos.get_tn_router(router.id)
+        tn_intf = tn_router.get_intf_by_subnet(subnet_id)
+
         # TODO(jerryz): move this out of transaction.
         setattr(context, 'GUARD_TRANSACTION', False)
         return (self._core_plugin.create_port(context, {
@@ -421,12 +472,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             {'tenant_id': subnet['tenant_id'],
              'network_id': subnet['network_id'],
              'fixed_ips': [fixed_ip],
-             'mac_address': None,
+             'mac_address': '00:01:02:03:04:05',
              'admin_state_up': True,
              'device_id': router.id,
              'device_owner': owner,
-             'name': ''}}), [subnet], True)
-
+             'name': tn_intf.extern_name}}), [subnet], True)
 
     def _allocate_floatingip(self, context, obj):
         """

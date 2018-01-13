@@ -12,12 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os
-import signal
-import libvirt
 import subprocess
-import time
-from shutil import copyfile
+
 
 from oslo_log import log as logging
 
@@ -35,7 +31,7 @@ class TNOSvm():
                   + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=/opt/stack/tnos/nothing '
     '''
 
-    kvm_cmd = 'kvm -nographic -net tap,ifname=%(tap0)s,script=no -net nic ' \
+    kvm_cmd = 'sudo kvm -nographic -net tap,ifname=%(tap0)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap1)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap2)s,script=no -net nic %(image_path)s'
 
@@ -59,8 +55,6 @@ class TNOSvm():
         cmd = 'sudo cp ' + source_image + ' ' + image_path
         LOG.debug("copy file :%s to %s" % (source_image, self.image_name))
         subprocess.call(cmd, shell=True)
-
-        LOG.debug("%s init" % self.vmname)
 
 
     def start(self, manage_intf, manage_ip):
@@ -139,7 +133,6 @@ class TNOSvm():
         subprocess.stdin.write('zone trust \n')
         cmd = 'ip address '+ ip + ' ' + mask +'\n'
         subprocess.stdin.write(cmd)
-        LOG.debug('exec cmd (%s) from stdin' % (cmd))
 
     def enable_ping(self, subprocess, intf_id):
         self.into_interface(subprocess, intf_id)

@@ -14,7 +14,6 @@
 
 import time
 import sys
-import subprocess
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -41,6 +40,8 @@ LOG = logging.getLogger(None).logger
 #LOG.addHandler(streamlog)
 LOG.setLevel(logging.DEBUG)
 
+LOG.debug('trace')
+
 CFG_ARGS = [
              '--config-file',
              '/etc/neutron/neutron.conf',
@@ -54,7 +55,12 @@ SUPPORTED_DR = ['vlan']
 cfg.CONF(args=CFG_ARGS, project='neutron',
          version='%%prog %s' % version.version_info.release_string(),
          **CFG_KWARGS)
+
+LOG.debug('trace')
+
 cfg.CONF.import_group('ml2_tn', 'networking_tn.common.config')
+
+LOG.debug('trace')
 
 from networking_tn.common import resources
 from networking_tn.common import utils
@@ -63,8 +69,10 @@ from networking_tn.tasks import tasks
 from networking_tn.tasks import constants as t_consts
 from networking_tn.db import models as tn_db
 from networking_tn.tnosclient import tnos_router as tnos
-from networking_tn.ovsctl import ovsctl
+from networking_tn.ovsctl import ovs_cb as ovsctl
 from networking_tn.common import config
+
+LOG.debug('trace')
 
 class Progress(object):
     def __init__(self, total, name=''):
@@ -103,6 +111,7 @@ class Fake_context(object):
 
         self.session = engine.get_session(autocommit=True,
                                           expire_on_commit=False)
+
         self.request_id = 'migration_context'
 
 
@@ -144,7 +153,7 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         if port_name is None:
             return
 
-        router = tnos.TnosRouter.get_tn_router(router_id)
+        router = tnos.get_tn_router(router_id)
 
         if is_gw:
             intf_id = tnos.MANAGE_INTF_ID

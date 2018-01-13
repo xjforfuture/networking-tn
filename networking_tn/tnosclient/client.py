@@ -88,7 +88,7 @@ class FortiosApiClient(eventlet_client.EventletApiClient):
 
     def request(self, opt, content_type="application/json", **message):
         '''Issues request to controller.'''
-        self.message = self._render(getattr(templates, opt), **message)
+        self.message = self._render(opt, **message)
         method = self.message['method']
         url = self.message['path']
         body = self.message['body'] if 'body' in self.message else None
