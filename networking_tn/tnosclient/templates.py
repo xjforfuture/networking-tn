@@ -50,6 +50,35 @@ TOUCH = """
 }
 """
 
+ADD_SUB_INTF = """
+{
+    "path": "/api/system_interface?vdom=root",
+    "method": "POST",
+    "body": {
+            "binding_zone": "l2zone",
+            "zone_l2": "l2-trust",
+            "vlanid": "{{ vlanid }}",
+            "type": "subinterface",
+
+            "interface":"{{ intf_name }}",
+            "mkey": "{{ intf_name }}.{{ vlanid }}",
+            "mkey_id": " "
+    }
+}
+"""
+
+DEL_SUB_INTF = """
+{
+    "path": "/api/system_interface?vdom=root",
+    "method": "DELETE",
+    "body": {
+            "type": "subinterface",
+            "mkey": "{{ intf_name }}",
+            "mkey_id": "{{ id }}"
+    }
+}
+"""
+
 GET_INTF_INFO = """
 {
     "path": "/api/system_interface?vdom=root",
@@ -65,7 +94,19 @@ CFG_INTF = """
             "mode": "static",
             "binding_zone": "l3zone",
             "zone_l3": "trust",
-            "allowaccess": [],
+            
+            {% if allows is defined %}
+            "allowaccess": [
+                {% for allow in allows[:-1] %}
+                    "{{ allow }}",
+                {% endfor %}
+                "{{ allows[-1] }}"
+            ],
+            {% else %}
+                "allowaccess": [],
+            {% endif %}
+            
+            
             "_id": "{{ intf_name }}",
             
             {% if dns_state is defined %}
@@ -80,10 +121,10 @@ CFG_INTF = """
                 "mtu": "1500",
             {% endif %} 
             
-            {% if vlan is defined %}
-                "vlan": "{{ vlan }}",
+            {% if vlanid is defined %}
+                "vlanid": "{{ vlanid }}",
             {% else %}
-                "vlan": " ",
+                "vlanid": " ",
             {% endif %} 
             
             "interface":"ethernet0",

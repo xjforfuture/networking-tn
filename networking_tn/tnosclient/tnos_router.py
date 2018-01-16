@@ -1,13 +1,14 @@
 
 import neutron.plugins.ml2.models as ml2_db
 
+import time
 import subprocess
 import shelve
 import sys
 from oslo_log import log as logging
 
 from networking_tn.tnosclient import tnos_driver as tn_drv
-#from networking_tn.ovsctl import ovs_cb as ovsctl
+from networking_tn.tnosclient import ovs_cb as ovsctl
 from networking_tn.common import config
 from networking_tn.tnosclient import templates
 
@@ -21,7 +22,12 @@ else:
 
 ROUTER_MAX_INTF = 3
 MANAGE_INTF_ID = 0
-GW_INTF = ROUTER_MAX_INTF - 1
+ROUTER_INTF = 1
+GW_INTF = 2
+
+MIN_SUB_INTF_ID = 1
+MAX_SUB_INTF_ID = 4094
+
 
 INT_BRIDGE_NAME = 'br-int'
 TN_ROUTER_DB_NAME = '/opt/stack/tnos/tn_router_db'
@@ -86,11 +92,10 @@ def get_manage_ip():
     for item in tn_db.items():
         tn_router = tn_db[item[0]]
         if type(tn_router) == TnosRouter:
-            LOG.debug('trace')
-        ip = tn_router.manage_ip
-        ip = ip.split('.')
-        if int(ip[2]) > max:
-            max = int(ip[2])
+            ip = tn_router.manage_ip
+            ip = ip.split('.')
+            if int(ip[2]) > max:
+                max = int(ip[2])
 
     if ip != None:
         ip[2] = str(max + 1)
@@ -105,19 +110,23 @@ def get_tn_router(router_id):
     return tn_db_get(router_id)
 
 class TNL3Interface(object):
-    def __init__(self, extern_name, inner_name, status=False):
+    def __init__(self, extern_name, inner_name):
         self.subnet_id = ''
         self.extern_id = ''
         self.inner_id = ''
         self.extern_name = extern_name
         self.inner_name = inner_name
-        self.status = False #True is usred
         self.state = None
 
         self.type = ' '
         self.mac = '00:00:00:00:00:01'
+        self.vlan_id = []
         self.ip_prefix = '0.0.0.0/0'
         self.is_gw = False
+
+        #subinterface attribute
+        self.is_sub_intf = False
+        self.sub_intf = []
 
     def init(self):
         self.subnet_id = ''
@@ -145,7 +154,7 @@ class TNL3Route(object):
 
 class TnosRouter(object):
 
-    def __init__(self, router_id, tenant_id, name, image_path='tnos.qcow2', manage_ip='90.1.1.1'):
+    def __init__(self, context, router_id, tenant_id, name, image_path='tnos.qcow2', manage_ip='90.1.1.1'):
         router_id = tn_router_id_convert(router_id)
         self.router_id = router_id
         self.tenant_id = tenant_id
@@ -159,19 +168,20 @@ class TnosRouter(object):
 
         self.vm = create_tnos(router_id, image_path, self.manage_ip)
 
-        self.init_intf(self.manage_ip)
+        self.init_intf(context, self.manage_ip)
         self.init_addr()
         self.route_entry = []
 
-
-    def del_router(self):
+    def del_router(self, context):
+        ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[ROUTER_INTF].extern_name)
+        ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[GW_INTF].extern_name)
         self.vm.destroy()
         tn_db_del(self.router_id)
 
     def store_router(self):
         tn_db_modify(self.router_id, self)
 
-    def init_intf(self, manage_ip):
+    def init_intf(self, context, manage_ip):
         self.intfs = []
         cmd = ''
         for i in range(0, ROUTER_MAX_INTF):
@@ -179,11 +189,9 @@ class TnosRouter(object):
             intf = TNL3Interface('tap' + str(i) + '-' + self.router_id, 'ethernet' + str(i))
             if i == MANAGE_INTF_ID:
                 intf.ip = manage_ip
-                intf.status = True
-
-            if i == GW_INTF:
-                intf.status = True
-                intf.is_gw = True
+            else:
+                if i == GW_INTF:
+                    intf.is_gw = True
 
             self.intfs.append(intf)
             cmd = cmd + 'sudo ifconfig %s up \n' % intf.extern_name
@@ -197,26 +205,60 @@ class TnosRouter(object):
         cmd = 'sudo ifconfig ' + self.intfs[MANAGE_INTF_ID].extern_name + ' ' + extern_ip + '/24'
         subprocess.Popen(cmd, shell=True)
 
-    def add_intf(self):
-        #ovsdb = ovsctl.OvsCtlBlock()
-        #(port_name, tag) = ovsdb.get_port_tag(port['id'])
-        #if port_name is None or port_name == 'nothing':
-        #    return
+    def add_intf(self, context, api_client, router_id, port, is_gw):
 
-        for intf in self.intfs:
-            if intf.status:
-                continue
-            # delete tmp, need later
-            # ovsdb.del_port(l3_tn.INT_BRIDGE_NAME, port_name)
-            intf.status = True
+        LOG.debug(port['id'])
 
+        port_name = None
+        for i in range(10):
+            (port_name, tag) = ovsctl.get_port_tag(context, port['id'])
+            if port_name == None or tag == []:
+                time.sleep(3)
+            else:
+                break
+
+        if port_name == None or tag == []:
+            return None
+
+        cmd = 'sudo ip netns exec qrouter-'+router_id+' ifconfig '+port_name+' down'
+        subprocess.Popen(cmd, shell=True)
+
+        if is_gw:
+            intf = self.intfs[GW_INTF]
+            intf.vlan_id.append(tag)
+            ovsctl.add_port(context, INT_BRIDGE_NAME, intf.extern_name)
+            ovsctl.add_access_port_tag(context, intf.extern_name, tag)
             return intf
+        else:
+            # add and get intferface by restful api
+            intf = self.intfs[ROUTER_INTF]
+            api_client.request(templates.ADD_SUB_INTF, intf_name=intf.inner_name, vlanid=tag)
 
-    def del_intf(self, api_client, intf):
+            if intf.sub_intf == []:
+                ovsctl.add_port(context, INT_BRIDGE_NAME, intf.extern_name)
+            ovsctl.add_trunk_port_tag(context, intf.extern_name, tag)
 
-        intf.init()
+            intf.vlan_id.append(tag)
+            sub_intf = TNL3Interface(intf.extern_name, intf.inner_name+'.'+str(tag))
+            sub_intf.extern_id = port['id']
+            sub_intf.vlan_id.append(tag)
+            intf.sub_intf.append(sub_intf)
 
+            self.get_intf_info(api_client)
 
+            return sub_intf
+
+    def del_intf(self, context, api_client, intf):
+        if self.intfs[GW_INTF] is intf:
+            ovsctl.del_access_port_tag(context, intf.extern_name)
+            intf.vlan_id = []
+        else:
+            api_client.request(templates.DEL_SUB_INTF, intf_name=intf.inner_name, id=intf.inner_id)
+            ovsctl.del_trunk_port_tag(context, intf.extern_name, intf.vlan_id[0])
+
+            main_intf = self.intfs[ROUTER_INTF]
+            main_intf.vlan_id.remove(intf.vlan_id[0])
+            main_intf.sub_intf.remove(intf)
 
     def get_intf_by_subnet(self, subnet_id):
         for intf in self.intfs:
@@ -224,9 +266,13 @@ class TnosRouter(object):
                 return intf
 
     def get_intf_by_extern_id(self, extern_id):
-        for intf in self.intfs:
-            if intf.extern_id == extern_id:
-                return intf
+        if self.intfs[GW_INTF].extern_id == extern_id:
+            return self.intfs[GW_INTF]
+
+        intf = self.intfs[ROUTER_INTF]
+        for sub_intf in intf.sub_intf:
+            if sub_intf.extern_id == extern_id:
+                return sub_intf
 
 
     def get_intf_info(self, api_client):
@@ -234,10 +280,24 @@ class TnosRouter(object):
         intf_info = msg['reply']
 
         for info in intf_info:
-            for intf in self.intfs:
+            if info['mkey'] == self.intfs[MANAGE_INTF_ID].inner_name:
+                continue
+
+            if info['mkey'] == self.intfs[GW_INTF].inner_name:
+                self.intfs[GW_INTF].inner_id = info['mkey_id']
+                self.intfs[GW_INTF].type = info['type']
+                continue
+
+            if info['mkey'] == self.intfs[ROUTER_INTF].inner_name:
+                self.intfs[ROUTER_INTF].inner_id = info['mkey_id']
+                self.intfs[ROUTER_INTF].type = info['type']
+                continue
+
+            for intf in self.intfs[ROUTER_INTF].sub_intf:
                 if info['mkey'] == intf.inner_name:
                     intf.inner_id = info['mkey_id']
                     intf.type = info['type']
+
 
     def get_mac(self):
         #self.api_client.request()
@@ -245,7 +305,9 @@ class TnosRouter(object):
 
     def cfg_intf_ip(self, api_client, intf, ip_prefix):
         intf.ip_prefix = ip_prefix
-        api_client.request(templates.CFG_INTF, intf_name=intf.inner_name, id=intf.inner_id, type=intf.type, ip_prefix=ip_prefix)
+        allows = ["ping"]
+        api_client.request(templates.CFG_INTF, intf_name=intf.inner_name, id=intf.inner_id, type=intf.type,
+                           ip_prefix=ip_prefix, allows=allows)
 
     def add_static_route(self, api_client, dest, prefix, gw_ip):
         route = TNL3Route(dest, prefix, gw_ip)
@@ -276,20 +338,33 @@ class TnosRouter(object):
 
 
 def main():
-    tn_router = TnosRouter('1234567890', '55', '66', '/opt/stack/tnos/tnos.qcow2', '90.1.1.1')
+    tn_router = TnosRouter(None, '1234567890', '55', '66', '/opt/stack/tnos/tnos.qcow2', '90.1.1.1')
 
     tn_router.store_router()
     db_router = get_tn_router('1234567890')
     print(db_router.name, db_router.vm.vmname, db_router.manage_ip)
 
     conn = config.get_apiclient(db_router.manage_ip)
+
+    intf = db_router.intfs[ROUTER_INTF]
+    conn.request(templates.ADD_SUB_INTF, intf_name=intf.inner_name, vlanid=12)
+
+    intf.vlan_id.append(12)
+    sub_intf = TNL3Interface(intf.extern_name, intf.inner_name+'.'+'12')
+    sub_intf.extern_id = 'xxxx'
+    sub_intf.vlan_id.append(12)
+    intf.sub_intf.append(sub_intf)
+
     db_router.get_intf_info(conn)
 
-    db_router.cfg_intf_ip(conn, tn_router.intfs[1], '55.1.1.1/24')
+
+    db_router.cfg_intf_ip(conn, sub_intf, '55.1.1.1/24')
     db_router.add_static_route(conn, dest='0.0.0.0', prefix='0.0.0.0', gw_ip=db_router.manage_ip)
     db_router.add_address_entry(conn, 'xxxxx', '33.1.1.0/24')
 
     db_router.del_address_entry(conn, 'xxxxx')
+
+    conn.request(templates.DEL_SUB_INTF, intf_name=sub_intf.inner_name, id=sub_intf.inner_id)
 
     #db_router.del_router()
 

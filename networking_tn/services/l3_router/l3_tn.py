@@ -58,7 +58,7 @@ def neutron_to_tnos(id):
 
 
 class TNL3ServicePlugin(router.L3RouterPlugin):
-    """Fortinet L3 service Plugin."""
+    """tn L3 service Plugin."""
 
     supported_extension_aliases = ["router", "ext-gw-mode", "extraroute"]
 
@@ -90,6 +90,40 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         return self.clients[router_id]
 
+    '''
+    def create_router(self, context, router):
+        LOG.debug("create_router: router=%s" % (router))
+        return super(TNL3ServicePlugin, self).create_router(context, router)
+
+    def delete_router(self, context, id):
+        LOG.debug("delete_router: router id=%s", id)
+        super(TNL3ServicePlugin, self).delete_router(context, id)
+
+    def add_router_interface(self, context, router_id, interface_info):
+        """creates interface on the tn device."""
+        LOG.debug("TNL3ServicePlugin.add_router_interface: "
+                  "router_id=%(router_id)s "
+                  "interface_info=%(interface_info)r",
+                  {'router_id': router_id, 'interface_info': interface_info})
+
+        info = super(TNL3ServicePlugin, self).add_router_interface(
+                context, router_id, interface_info)
+
+        return info
+
+    def remove_router_interface(self, context, router_id, interface_info):
+        """Deletes vlink, default router from Fortinet device."""
+        LOG.debug("TNL3ServicePlugin.remove_router_interface called: "
+                  "router_id=%(router_id)s "
+                  "interface_info=%(interface_info)r",
+                  {'router_id': router_id, 'interface_info': interface_info})
+
+        info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
+
+        return info
+    '''
+
+
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
         # Limit one router per tenant
@@ -104,18 +138,18 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         router_db = tn_db.query_record(context, l3_db.Router, name=router_name, tenant_id=tenant_id)
         LOG.debug(router_db)
         router_id = router_db['id']
-        with context.session.begin(subtransactions=True):
-            try:
-                tn_router = tnos.TnosRouter(router_id, tenant_id, router_name, self._tn_info["image_path"], self._tn_info['address'])
-                self.clients[router_id] = config.get_apiclient(tn_router.manage_ip)
-                tn_router.get_intf_info(self.clients[router_id])
-                tn_router.store_router()
-                #router_db = tn_db.Tn_Router_Db.add_record(context, id=router_name, name=router_name, tenant_id=tenant_id)
 
-            except Exception as e:
-                LOG.error("Failed to create_router router=%(router)s",
-                          {"router": router})
-                resources.Exinfo(e)
+        try:
+            tn_router = tnos.TnosRouter(context, router_id, tenant_id, router_name, self._tn_info["image_path"], self._tn_info['address'])
+            self.clients[router_id] = config.get_apiclient(tn_router.manage_ip)
+            tn_router.get_intf_info(self.clients[router_id])
+            tn_router.store_router()
+            #router_db = tn_db.Tn_Router_Db.add_record(context, id=router_name, name=router_name, tenant_id=tenant_id)
+
+        except Exception as e:
+            LOG.error("Failed to create_router router=%(router)s",
+                      {"router": router})
+            resources.Exinfo(e)
 
         #router = tn_db.query_record(context, l3_db.Router, name=router_name)
         #tn_router.id = router['id']
@@ -132,23 +166,21 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
     def delete_router(self, context, id):
         LOG.debug("delete_router: router id=%s", id)
         try:
-            with db_api.context_manager.writer.using(context):
-                router = tn_db.query_record(context, l3_db.Router, id=id)
-                setattr(context, 'GUARD_TRANSACTION', False)
-                super(TNL3ServicePlugin, self).delete_router(context, id)
 
-                if getattr(router, 'tenant_id', None):
-                    router_name = router['name']
-                    tenant_id = router['tenant_id']
+            router = tn_db.query_record(context, l3_db.Router, id=id)
+            setattr(context, 'GUARD_TRANSACTION', False)
+            super(TNL3ServicePlugin, self).delete_router(context, id)
 
-                    LOG.debug(router)
-                    #tn_router = tnos.get_tn_router(router_name=router_name)
-                    tn_router = tnos.get_tn_router(router['id'])
-                    #tn_router_db = tn_db.query_record(context, tn_db.Tn_Router_Db, name=router_name)
-                    #LOG.debug('id %s , name %s, tenant_id %s', tn_router_db.id, tn_router_db.name, tn_router_db.tenant_id)
+            if getattr(router, 'tenant_id', None):
 
-                    if tn_router is not None:
-                        tn_router.del_router()
+                LOG.debug(router)
+                #tn_router = tnos.get_tn_router(router_name=router_name)
+                tn_router = tnos.get_tn_router(router['id'])
+                #tn_router_db = tn_db.query_record(context, tn_db.Tn_Router_Db, name=router_name)
+                #LOG.debug('id %s , name %s, tenant_id %s', tn_router_db.id, tn_router_db.name, tn_router_db.tenant_id)
+
+                if tn_router is not None:
+                    tn_router.del_router(context)
 
 
         except Exception as e:
@@ -164,68 +196,65 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                   "interface_info=%(interface_info)r",
                   {'router_id': router_id, 'interface_info': interface_info})
 
-        tn_router = tnos.get_tn_router(router_id=router_id)
-        if tn_router == None:
-            LOG.debug('tn_router is none')
-
-        client = self.get_tn_client(router_id)
-
-        if client == None:
-            LOG.debug('client is none')
-
-        tn_intf = tn_router.add_intf()
-        tn_intf.subnet_id = interface_info['subnet_id']
-
-        tn_router.store_router()
-
-        with context.session.begin(subtransactions=True):
-            info = super(TNL3ServicePlugin, self).add_router_interface(
-                context, router_id, interface_info)
-            port = db.get_port(context, info['port_id'])
-            port['admin_state_up'] = True
-            port['port'] = port
-            LOG.debug("TNL3ServicePlugin: "
-                      "context=%(context)s"
-                      "port=%(port)s "
-                      "info=%(info)r",
-                      {'context': context, 'port': port, 'info': info})
-            interface_info = info
-            subnet = self._core_plugin._get_subnet(context,interface_info['subnet_id'])
-            network_id = subnet['network_id']
-            tenant_id = port['tenant_id']
-            port_filters = {'network_id': [network_id],
-                            'device_owner': [DEVICE_OWNER_ROUTER_INTF]}
-            port_count = self._core_plugin.get_ports_count(context,
-                                                           port_filters)
-            # port count is checked against 2 since the current port is already
-            # added to db
-            if port_count == 2:
-                # This subnet is already part of some router
-                LOG.error(_LE("TNL3ServicePlugin: adding redundant "
+        info = super(TNL3ServicePlugin, self).add_router_interface(
+            context, router_id, interface_info)
+        port = db.get_port(context, info['port_id'])
+        port['admin_state_up'] = True
+        port['port'] = port
+        LOG.debug("TNL3ServicePlugin: "
+                  "context=%(context)s"
+                  "port=%(port)s "
+                  "info=%(info)r",
+                  {'context': context, 'port': port, 'info': info})
+        interface_info = info
+        subnet = self._core_plugin._get_subnet(context,interface_info['subnet_id'])
+        network_id = subnet['network_id']
+        tenant_id = port['tenant_id']
+        port_filters = {'network_id': [network_id],
+                        'device_owner': [DEVICE_OWNER_ROUTER_INTF]}
+        port_count = self._core_plugin.get_ports_count(context,
+                                                       port_filters)
+        # port count is checked against 2 since the current port is already
+        # added to db
+        if port_count == 2:
+            # This subnet is already part of some router
+            LOG.error(_LE("TNL3ServicePlugin: adding redundant "
+                          "router interface is not supported"))
+            raise Exception(_("TNL3ServicePlugin:adding redundant "
                               "router interface is not supported"))
-                raise Exception(_("TNL3ServicePlugin:adding redundant "
-                                  "router interface is not supported"))
-            try:
-                tn_intf.extern_id = port['id']
-                tn_router.cfg_intf_ip(client, tn_intf, subnet['gateway_ip']+'/24')
+        try:
+            tn_router = tnos.get_tn_router(router_id=router_id)
+            if tn_router == None:
+                LOG.debug('tn_router is none')
 
-                addr_name = neutron_to_tnos(tn_intf.extern_id)
-                if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_GW]:
-                    tn_intf.is_gw = True
-                    tn_router.add_address_entry(client, addr_name, subnet['gateway_ip']+'/32')
-                else:
-                    tn_router.add_address_entry(client, addr_name, subnet['gateway_ip']+'/24')
-                tn_router.store_router()
+            client = self.get_tn_client(router_id)
 
-            except Exception as e:
-                LOG.error(_LE("Failed to create TN resources to add "
-                            "router interface. info=%(info)s, "
-                            "router_id=%(router_id)s"),
-                          {"info": info, "router_id": router_id})
+            if client == None:
+                LOG.debug('client is none')
 
-                with excutils.save_and_reraise_exception():
-                    self.remove_router_interface(context, router_id,
-                                                 interface_info)
+            addr_name = neutron_to_tnos(port['id'])
+            if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_GW]:
+                tn_intf = tn_router.add_intf(context, client, router_id, port, True)
+                tn_router.add_address_entry(client, addr_name, subnet['gateway_ip'] + '/32')
+            else:
+                tn_intf = tn_router.add_intf(context, client, router_id, port, False)
+                tn_router.add_address_entry(client, addr_name, subnet['gateway_ip'] + '/24')
+
+            if tn_intf != None:
+                tn_intf.subnet_id = interface_info['subnet_id']
+                tn_router.cfg_intf_ip(client, tn_intf, subnet['gateway_ip'] + '/24')
+
+            tn_router.store_router()
+
+        except Exception as e:
+            LOG.error(_LE("Failed to create TN resources to add "
+                        "router interface. info=%(info)s, "
+                        "router_id=%(router_id)s"),
+                      {"info": info, "router_id": router_id})
+
+            with excutils.save_and_reraise_exception():
+                self.remove_router_interface(context, router_id,
+                                             interface_info)
         return info
 
     def remove_router_interface(self, context, router_id, interface_info):
@@ -234,36 +263,22 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                   "router_id=%(router_id)s "
                   "interface_info=%(interface_info)r",
                   {'router_id': router_id, 'interface_info': interface_info})
-        with context.session.begin(subtransactions=True):
-            # TODO(jerryz): move this out of transaction.
-            setattr(context, 'GUARD_TRANSACTION', False)
-            info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
 
-            tn_router = tnos.get_tn_router(router_id=router_id)
-            client = self.get_tn_client(router_id)
+        info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
+
+        tn_router = tnos.get_tn_router(router_id=router_id)
+        client = self.get_tn_client(router_id)
 
 
-            tn_intf = tn_router.get_intf_by_extern_id(interface_info['port_id'])
+        tn_intf = tn_router.get_intf_by_extern_id(interface_info['port_id'])
+        if tn_intf != None:
             addr_name = neutron_to_tnos(tn_intf.extern_id)
             tn_router.del_address_entry(client, addr_name)
-            tn_router.del_intf(client, tn_intf)
+            tn_router.del_intf(context, client, tn_intf)
             tn_router.store_router()
 
-            '''
-            try:
-                subnet = self._core_plugin._get_subnet(context,
-                                                       info['subnet_id'])
-                tenant_id = subnet['tenant_id']
-                network_id = subnet['network_id']
-
-            except Exception:
-                with excutils.save_and_reraise_exception():
-                    LOG.error(_LE("Fail remove of interface from Fortigate "
-                                  "router interface. info=%(info)s, "
-                                  "router_id=%(router_id)s"),
-                             {"info": info, "router_id": router_id})
-            '''
         return info
+
 
     def create_floatingip(self, context, floatingip):
         """Create floating IP.
@@ -447,6 +462,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                                     port_id,
                                                     do_notify=do_notify)
 
+    '''
 
     def _add_interface_by_subnet(self, context, router, subnet_id, owner):
         LOG.debug("_add_interface_by_subnet(): router=%(router)s, "
@@ -462,8 +478,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         fixed_ip = {'ip_address': subnet['gateway_ip'],
                     'subnet_id': subnet['id']}
 
-        tn_router = tnos.get_tn_router(router.id)
-        tn_intf = tn_router.get_intf_by_subnet(subnet_id)
+        #tn_router = tnos.get_tn_router(router.id)
+        #tn_intf = tn_router.get_intf_by_subnet(subnet_id)
 
         # TODO(jerryz): move this out of transaction.
         setattr(context, 'GUARD_TRANSACTION', False)
@@ -476,7 +492,9 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
              'admin_state_up': True,
              'device_id': router.id,
              'device_owner': owner,
-             'name': tn_intf.extern_name}}), [subnet], True)
+             'name': ''}}), [subnet], True)
+
+    '''
 
     def _allocate_floatingip(self, context, obj):
         """
