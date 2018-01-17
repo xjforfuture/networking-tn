@@ -146,10 +146,10 @@ class TNL3Address(object):
         self.ip_prefix = ip_prefix
 
 class TNL3Route(object):
-    def __init__(self, dest, prefix, gw_ip):
+    def __init__(self, dest, prefix, next_hop):
         self.dest = dest
         self.prefix = prefix
-        self.gw_ip =gw_ip
+        self.next_hop =next_hop
 
 
 class TnosRouter(object):
@@ -314,10 +314,19 @@ class TnosRouter(object):
         api_client.request(templates.CFG_INTF, intf_name=intf.inner_name, id=intf.inner_id, type=intf.type,
                            ip_prefix=ip_prefix, allows=allows)
 
-    def add_static_route(self, api_client, dest, prefix, gw_ip):
-        route = TNL3Route(dest, prefix, gw_ip)
+    def add_static_route(self, api_client, dest, prefix, next_hop):
+        route = TNL3Route(dest, prefix, next_hop)
         self.route_entry.append(route)
-        api_client.request(templates.ADD_STATIC_ROUTE, dest=dest, netmask=prefix, gw_ip=gw_ip)
+        api_client.request(templates.ADD_STATIC_ROUTE, dest=dest, netmask=prefix, gw_ip=next_hop)
+
+    def del_static_route(self, api_client, route):
+        api_client.request(templates.DEL_STATIC_ROUTE, dest=route.dest, netmask=route.prefix, gw_ip=route.next_hop)
+        self.route_entry.remove(route)
+
+    def get_static_route(self, dest, prefix, next_hop):
+        for route in self.route_entry:
+            if route.dest == dest and route.prefix == prefix and route.next_hop == next_hop:
+                return route
 
     def init_addr(self):
         self.addr = {}
@@ -343,13 +352,14 @@ class TnosRouter(object):
 
 
 def main():
-    tn_router = TnosRouter(None, '1234567890', '55', '66', '/opt/stack/tnos/tnos.qcow2', '90.1.1.1')
+    tn_router = TnosRouter(None, '1234567890', '55', '66', '/opt/stack/tnos/tnos.qcow2', '80.1.1.1')
 
     tn_router.store_router()
     db_router = get_tn_router('1234567890')
     print(db_router.name, db_router.vm.vmname, db_router.manage_ip)
 
     conn = config.get_apiclient(db_router.manage_ip)
+
 
     intf = db_router.intfs[ROUTER_INTF]
     conn.request(templates.ADD_SUB_INTF, intf_name=intf.inner_name, vlanid=12)
@@ -362,9 +372,13 @@ def main():
 
     db_router.get_intf_info(conn)
 
-
     db_router.cfg_intf_ip(conn, sub_intf, '55.1.1.1/24')
-    db_router.add_static_route(conn, dest='0.0.0.0', prefix='0.0.0.0', gw_ip=db_router.manage_ip)
+    db_router.add_static_route(conn, dest='0.0.0.0', prefix='0', next_hop='55.1.1.1')
+    db_router.add_static_route(conn, dest='10.1.1.0', prefix='24', next_hop='55.1.1.1')
+    route = db_router.get_static_route(dest='0.0.0.0', prefix='0', next_hop='55.1.1.1')
+    db_router.del_static_route(conn, route)
+
+
     db_router.add_address_entry(conn, 'xxxxx', '33.1.1.0/24')
 
     db_router.del_address_entry(conn, 'xxxxx')

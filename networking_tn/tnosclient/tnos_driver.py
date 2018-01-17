@@ -12,9 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os
 import subprocess
-
+import shutil
 
 from oslo_log import log as logging
 
@@ -51,10 +50,10 @@ class TNOSvm():
         image_path = '/'.join(image_path)
 
         self.image_name = image_path
-        #copyfile(source_image, image_path)
-        cmd = 'sudo cp ' + source_image + ' ' + image_path
         LOG.debug("copy file :%s to %s" % (source_image, self.image_name))
-        subprocess.call(cmd, shell=True)
+        shutil.copy(source_image, image_path)
+        #cmd = 'sudo cp ' + source_image + ' ' + image_path
+        #subprocess.call(cmd, shell=True)
 
 
     def start(self, manage_intf, manage_ip):

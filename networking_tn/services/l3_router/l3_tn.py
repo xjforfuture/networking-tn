@@ -90,40 +90,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         return self.clients[router_id]
 
-    '''
-    def create_router(self, context, router):
-        LOG.debug("create_router: router=%s" % (router))
-        return super(TNL3ServicePlugin, self).create_router(context, router)
-
-    def delete_router(self, context, id):
-        LOG.debug("delete_router: router id=%s", id)
-        super(TNL3ServicePlugin, self).delete_router(context, id)
-
-    def add_router_interface(self, context, router_id, interface_info):
-        """creates interface on the tn device."""
-        LOG.debug("TNL3ServicePlugin.add_router_interface: "
-                  "router_id=%(router_id)s "
-                  "interface_info=%(interface_info)r",
-                  {'router_id': router_id, 'interface_info': interface_info})
-
-        info = super(TNL3ServicePlugin, self).add_router_interface(
-                context, router_id, interface_info)
-
-        return info
-
-    def remove_router_interface(self, context, router_id, interface_info):
-        """Deletes vlink, default router from Fortinet device."""
-        LOG.debug("TNL3ServicePlugin.remove_router_interface called: "
-                  "router_id=%(router_id)s "
-                  "interface_info=%(interface_info)r",
-                  {'router_id': router_id, 'interface_info': interface_info})
-
-        info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
-
-        return info
-    '''
-
-
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
         # Limit one router per tenant
@@ -162,27 +128,72 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
                   {'id': id, 'router': router})
 
-        gw = router['router'].get('external_gateway_info')
+
         updated = (super(TNL3ServicePlugin, self).update_router(context, id, router))
 
         LOG.debug(updated)
 
-        if gw != None:
-            network_id = gw.get('network_id')
+        gateway = router['router'].get('external_gateway_info')
+        if gateway != None:
+            self.__update_tn_router_gw(context, id, gateway, updated)
 
-            if network_id != None:
-                #add gateway
-                port_id = updated.get('gw_port_id')
-                if port_id != None:
-                    port = db.get_port(context, port_id)
-                    ips = updated['external_gateway_info']['external_fixed_ips']
-                    ip = ips[0]['ip_address']
-                    self.__add_tn_router_interface(context, id, port, ip)
-            else:
-                #del gatewayl
-                self.__remove_tn_router_interface(context, id, is_gw=True)
+        routes = router['router'].get('routes')
+        if routes != None:
+            self.__update_tn_router_route(id, routes)
 
         return updated
+
+    def __update_tn_router_gw(self, context, router_id, gateway, updated):
+        network_id = gateway.get('network_id')
+
+        if network_id != None:
+            # add gateway
+            port_id = updated.get('gw_port_id')
+            if port_id != None:
+                port = db.get_port(context, port_id)
+                ips = updated['external_gateway_info']['external_fixed_ips']
+                ip = ips[0]['ip_address']
+                self.__add_tn_router_interface(context, router_id, port, ip)
+        else:
+            # del gatewayl
+            self.__remove_tn_router_interface(context, router_id, is_gw=True)
+
+    def __update_tn_router_route(self, router_id, routes):
+        tn_router = tnos.get_tn_router(router_id=router_id)
+
+        LOG.debug('config route: %s', routes)
+        if tn_router == None:
+            LOG.debug('tn_router is none')
+
+        client = self.get_tn_client(router_id)
+        if client == None:
+            LOG.debug('client is none')
+
+        #add route
+        for route in routes:
+            #dest is x.x.x.x/x
+            dest = route['destination']
+            next_hop = route['nexthop']
+            dest = dest.split('/')
+            if tn_router.get_static_route(dest[0], dest[1], next_hop) == None:
+                tn_router.add_static_route(client, dest[0], dest[1], next_hop)
+
+        #del route
+        for old_route in tn_router.route_entry:
+            flag = False
+            for new_route  in routes:
+                dest = new_route['destination']
+                next_hop = new_route['nexthop']
+                dest = dest.split('/')
+                if old_route.dest==dest[0] and old_route.prefix==dest[1] and old_route.next_hop==next_hop:
+                    flag = True
+                    break
+
+            if flag == False:
+                tn_router.del_static_route(client,old_route)
+
+        tn_router.store_router()
+
 
     def delete_router(self, context, id):
         LOG.debug("delete_router: router id=%s", id)

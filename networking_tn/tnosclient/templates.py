@@ -166,6 +166,37 @@ ADD_STATIC_ROUTE = """
 }
 """
 
+DEL_STATIC_ROUTE = """
+{
+    "path": "/api/router_static?vdom=root",
+    "method": "DELETE",
+    "body": {
+
+        {% if gw_type is defined %}
+            "gw_type": "{{ gw_type }}",
+        {% else %}
+            "gw_type": "ip",
+        {% endif %} 
+
+        {% if gw_ip is defined %}
+            "gw_ip": "{{ gw_ip }}",
+        {% endif %}
+
+        {% if gw_interface is defined %}
+            "gw_interface": "{{ gw_interface }}",
+        {% endif %}
+
+        {% if distance is defined %}
+            "distance": "{{ distance }}",
+        {% endif %}
+
+        "mkey": "{{ dest }}",
+        "dest": "{{ dest }}", 
+        "netmask": "{{ netmask }}"
+    }
+}
+"""
+
 
 ADD_ADDRESS_ENTRY = """
 {
