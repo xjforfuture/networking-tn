@@ -161,7 +161,28 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
     def update_router(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
                   {'id': id, 'router': router})
-        return (super(TNL3ServicePlugin, self).update_router(context, id, router))
+
+        gw = router['router'].get('external_gateway_info')
+        updated = (super(TNL3ServicePlugin, self).update_router(context, id, router))
+
+        LOG.debug(updated)
+
+        if gw != None:
+            network_id = gw.get('network_id')
+
+            if network_id != None:
+                #add gateway
+                port_id = updated.get('gw_port_id')
+                if port_id != None:
+                    port = db.get_port(context, port_id)
+                    ips = updated['external_gateway_info']['external_fixed_ips']
+                    ip = ips[0]['ip_address']
+                    self.__add_tn_router_interface(context, id, port, ip)
+            else:
+                #del gatewayl
+                self.__remove_tn_router_interface(context, id, is_gw=True)
+
+        return updated
 
     def delete_router(self, context, id):
         LOG.debug("delete_router: router id=%s", id)
@@ -223,29 +244,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             raise Exception(_("TNL3ServicePlugin:adding redundant "
                               "router interface is not supported"))
         try:
-            tn_router = tnos.get_tn_router(router_id=router_id)
-            if tn_router == None:
-                LOG.debug('tn_router is none')
-
-            client = self.get_tn_client(router_id)
-
-            if client == None:
-                LOG.debug('client is none')
-
-            addr_name = neutron_to_tnos(port['id'])
-            if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_GW]:
-                tn_intf = tn_router.add_intf(context, client, router_id, port, True)
-                tn_router.add_address_entry(client, addr_name, subnet['gateway_ip'] + '/32')
-            else:
-                tn_intf = tn_router.add_intf(context, client, router_id, port, False)
-                tn_router.add_address_entry(client, addr_name, subnet['gateway_ip'] + '/24')
-
-            if tn_intf != None:
-                tn_intf.subnet_id = interface_info['subnet_id']
-                tn_router.cfg_intf_ip(client, tn_intf, subnet['gateway_ip'] + '/24')
-
-            tn_router.store_router()
-
+            self.__add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
         except Exception as e:
             LOG.error(_LE("Failed to create TN resources to add "
                         "router interface. info=%(info)s, "
@@ -257,6 +256,30 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                              interface_info)
         return info
 
+    def __add_tn_router_interface(self, context, router_id, port, ip):
+        tn_router = tnos.get_tn_router(router_id=router_id)
+        if tn_router == None:
+            LOG.debug('tn_router is none')
+
+        client = self.get_tn_client(router_id)
+
+        if client == None:
+            LOG.debug('client is none')
+
+        addr_name = neutron_to_tnos(port['id'])
+        if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_GW]:
+            tn_intf = tn_router.add_intf(context, client, router_id, port, True)
+            tn_router.add_address_entry(client, addr_name, ip + '/32')
+        else:
+            tn_intf = tn_router.add_intf(context, client, router_id, port, False)
+            tn_router.add_address_entry(client, addr_name, ip + '/24')
+
+        if tn_intf != None:
+            tn_router.cfg_intf_ip(client, tn_intf, ip + '/24')
+
+        tn_router.store_router()
+
+
     def remove_router_interface(self, context, router_id, interface_info):
         """Deletes vlink, default router from Fortinet device."""
         LOG.debug("TNL3ServicePlugin.remove_router_interface called: "
@@ -266,18 +289,25 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
 
+        self.__remove_tn_router_interface(context, router_id, port_id=interface_info['port_id'])
+
+        return info
+
+    def __remove_tn_router_interface(self, context, router_id, port_id=None, is_gw=False):
         tn_router = tnos.get_tn_router(router_id=router_id)
         client = self.get_tn_client(router_id)
 
+        if is_gw:
+            tn_intf = tn_router.get_router_gw_intf()
+        else:
+            tn_intf = tn_router.get_intf_by_extern_id(port_id)
 
-        tn_intf = tn_router.get_intf_by_extern_id(interface_info['port_id'])
         if tn_intf != None:
             addr_name = neutron_to_tnos(tn_intf.extern_id)
             tn_router.del_address_entry(client, addr_name)
             tn_router.del_intf(context, client, tn_intf)
             tn_router.store_router()
 
-        return info
 
 
     def create_floatingip(self, context, floatingip):
@@ -463,7 +493,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                                     do_notify=do_notify)
 
     '''
-
     def _add_interface_by_subnet(self, context, router, subnet_id, owner):
         LOG.debug("_add_interface_by_subnet(): router=%(router)s, "
                   "subnet_id=%(subnet_id)s, owner=%(owner)s",
@@ -478,9 +507,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         fixed_ip = {'ip_address': subnet['gateway_ip'],
                     'subnet_id': subnet['id']}
 
-        #tn_router = tnos.get_tn_router(router.id)
-        #tn_intf = tn_router.get_intf_by_subnet(subnet_id)
-
         # TODO(jerryz): move this out of transaction.
         setattr(context, 'GUARD_TRANSACTION', False)
         return (self._core_plugin.create_port(context, {
@@ -488,12 +514,10 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             {'tenant_id': subnet['tenant_id'],
              'network_id': subnet['network_id'],
              'fixed_ips': [fixed_ip],
-             'mac_address': '00:01:02:03:04:05',
              'admin_state_up': True,
              'device_id': router.id,
              'device_owner': owner,
              'name': ''}}), [subnet], True)
-
     '''
 
     def _allocate_floatingip(self, context, obj):

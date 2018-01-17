@@ -173,7 +173,6 @@ class TnosRouter(object):
         self.route_entry = []
 
     def del_router(self, context):
-        ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[ROUTER_INTF].extern_name)
         ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[GW_INTF].extern_name)
         self.vm.destroy()
         tn_db_del(self.router_id)
@@ -226,6 +225,7 @@ class TnosRouter(object):
         if is_gw:
             intf = self.intfs[GW_INTF]
             intf.vlan_id.append(tag)
+            intf.extern_id = port['id']
             ovsctl.add_port(context, INT_BRIDGE_NAME, intf.extern_name)
             ovsctl.add_access_port_tag(context, intf.extern_name, tag)
             return intf
@@ -234,7 +234,7 @@ class TnosRouter(object):
             intf = self.intfs[ROUTER_INTF]
             api_client.request(templates.ADD_SUB_INTF, intf_name=intf.inner_name, vlanid=tag)
 
-            if intf.sub_intf == []:
+            if len(intf.sub_intf) == 0:
                 ovsctl.add_port(context, INT_BRIDGE_NAME, intf.extern_name)
             ovsctl.add_trunk_port_tag(context, intf.extern_name, tag)
 
@@ -250,8 +250,8 @@ class TnosRouter(object):
 
     def del_intf(self, context, api_client, intf):
         if self.intfs[GW_INTF] is intf:
-            ovsctl.del_access_port_tag(context, intf.extern_name)
             intf.vlan_id = []
+            ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[GW_INTF].extern_name)
         else:
             api_client.request(templates.DEL_SUB_INTF, intf_name=intf.inner_name, id=intf.inner_id)
             ovsctl.del_trunk_port_tag(context, intf.extern_name, intf.vlan_id[0])
@@ -259,6 +259,9 @@ class TnosRouter(object):
             main_intf = self.intfs[ROUTER_INTF]
             main_intf.vlan_id.remove(intf.vlan_id[0])
             main_intf.sub_intf.remove(intf)
+
+            if len(main_intf.sub_intf) == 0:
+                ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[ROUTER_INTF].extern_name)
 
     def get_intf_by_subnet(self, subnet_id):
         for intf in self.intfs:
@@ -274,6 +277,8 @@ class TnosRouter(object):
             if sub_intf.extern_id == extern_id:
                 return sub_intf
 
+    def get_router_gw_intf(self):
+        return self.intfs[GW_INTF]
 
     def get_intf_info(self, api_client):
         msg = api_client.request(templates.GET_INTF_INFO)
