@@ -30,13 +30,13 @@ from neutron_fwaas.db.firewall import firewall_db
 from neutron_fwaas.db.firewall import firewall_router_insertion_db
 import neutron_fwaas.extensions as extensions
 
-from networking_fortinet._i18n import _LE
-from networking_fortinet.common import config
-from networking_fortinet.common import constants as constants
-from networking_fortinet.common import utils
-from networking_fortinet.db import models as fortinet_db
-from networking_fortinet.tasks import constants as t_consts
-from networking_fortinet.tasks import tasks
+from networking_tn._i18n import _LE
+from networking_tn.common import config
+from networking_tn.common import constants as constants
+from networking_tn.common import utils
+from networking_tn.db import models as fortinet_db
+from networking_tn.tasks import constants as t_consts
+from networking_tn.tasks import tasks
 
 LOG = logging.getLogger(__name__)
 FORTINET_FW = "fortinet_fw"
