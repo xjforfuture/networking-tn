@@ -3,7 +3,6 @@ import neutron.plugins.ml2.models as ml2_db
 
 import time
 import subprocess
-import shelve
 import sys
 from oslo_log import log as logging
 
@@ -11,6 +10,7 @@ from networking_tn.tnosclient import tnos_driver as tn_drv
 from networking_tn.tnosclient import ovs_cb as ovsctl
 from networking_tn.common import config
 from networking_tn.tnosclient import templates
+from networking_tn.db import tn_db
 
 if __name__ == '__main__':
     sys.path.append(r'/home/xiongjun/work/networking-tn/')
@@ -19,6 +19,8 @@ if __name__ == '__main__':
     LOG.setLevel(logging.DEBUG)
 else:
     LOG = logging.getLogger(__name__)
+
+TNOS_CLIENT = {}
 
 ROUTER_MAX_INTF = 3
 MANAGE_INTF_ID = 0
@@ -30,53 +32,21 @@ MAX_SUB_INTF_ID = 4094
 
 
 INT_BRIDGE_NAME = 'br-int'
-TN_ROUTER_DB_NAME = '/opt/stack/tnos/tn_router_db'
-
 
 def tn_router_id_convert(router_id):
     id = str(router_id[0:8])
     return id
 
-def tn_db_lock(fd):
-    #fcntl.flock(fd, fcntl.LOCK_EX)
-    pass
+def get_tn_client(router_id):
 
-def tn_db_unlock(fd):
-    #fcntl.flock(fd, fcntl.lock_un)
-    pass
+    if TNOS_CLIENT.has_key(router_id):
+        return TNOS_CLIENT[router_id]
 
-def tn_db_add(key, obj):
-    tn_db = shelve.open(TN_ROUTER_DB_NAME)
+    tn_router = get_tn_router(router_id)
 
-    tn_db_lock(tn_db)
-    tn_db[key] = obj
-    tn_db_unlock(tn_db)
-    tn_db.close()
+    TNOS_CLIENT[router_id] = config.get_apiclient(tn_router.manage_ip)
 
-def tn_db_modify(key, obj):
-    tn_db_add(key, obj)
-
-def tn_db_get(key):
-    tn_db = shelve.open(TN_ROUTER_DB_NAME)
-    tn_db_lock(tn_db)
-    try:
-        obj = tn_db[key]
-    except:
-        obj = None
-    finally:
-        tn_db.close()
-        tn_db_unlock(tn_db)
-
-    return obj
-
-def tn_db_del(key):
-
-    tn_db = shelve.open(TN_ROUTER_DB_NAME)
-    try:
-        del tn_db[key]
-    finally:
-        tn_db.close()
-
+    return TNOS_CLIENT[router_id]
 
 def create_tnos(name, image_path, manage_ip):
 
@@ -88,9 +58,11 @@ def create_tnos(name, image_path, manage_ip):
 def get_manage_ip():
     max = 0
     ip = None
-    tn_db = shelve.open(TN_ROUTER_DB_NAME)
-    for item in tn_db.items():
-        tn_router = tn_db[item[0]]
+    db = tn_db.tn_db_get(key=None)
+
+    for key in db:
+        tn_router = db[key]
+
         if type(tn_router) == TnosRouter:
             ip = tn_router.manage_ip
             ip = ip.split('.')
@@ -101,13 +73,13 @@ def get_manage_ip():
         ip[2] = str(max + 1)
         ip = '.'.join(ip)
 
-    tn_db.close()
+    db.close()
 
     return ip
 
 def get_tn_router(router_id):
     router_id = tn_router_id_convert(router_id)
-    return tn_db_get(router_id)
+    return tn_db.tn_db_get('router'+router_id)
 
 class TNL3Interface(object):
     def __init__(self, extern_name, inner_name):
@@ -154,12 +126,12 @@ class TNL3Route(object):
 
 class TnosRouter(object):
 
-    def __init__(self, context, router_id, tenant_id, name, image_path='tnos.qcow2', manage_ip='90.1.1.1'):
-        router_id = tn_router_id_convert(router_id)
+    def __init__(self, context, id, tenant_id, name, image_path='tnos.qcow2', manage_ip='90.1.1.1'):
+        router_id = tn_router_id_convert(id)
         self.router_id = router_id
         self.tenant_id = tenant_id
         self.name = name
-        #self.api_client = config.get_apiclient(manage_ip)
+
         ip = get_manage_ip()
         if ip is None:
             ip = manage_ip
@@ -172,13 +144,15 @@ class TnosRouter(object):
         self.init_addr()
         self.route_entry = []
 
+        TNOS_CLIENT[id] = config.get_apiclient(self.manage_ip)
+
     def del_router(self, context):
         ovsctl.del_port(context, INT_BRIDGE_NAME, self.intfs[GW_INTF].extern_name)
         self.vm.destroy()
-        tn_db_del(self.router_id)
+        tn_db.tn_db_del('router'+self.router_id)
 
-    def store_router(self):
-        tn_db_modify(self.router_id, self)
+    def store_router(self, router_obj):
+        tn_db.tn_db_modify('router'+self.router_id, router_obj)
 
     def init_intf(self, context, manage_ip):
         self.intfs = []
@@ -354,11 +328,12 @@ class TnosRouter(object):
 def main():
     tn_router = TnosRouter(None, '1234567890', '55', '66', '/opt/stack/tnos/tnos.qcow2', '80.1.1.1')
 
-    tn_router.store_router()
-    db_router = get_tn_router('1234567890')
-    print(db_router.name, db_router.vm.vmname, db_router.manage_ip)
+    tn_router.store_router(tn_router)
+    #db_router = get_tn_router('1234567890')
+    #print(db_router.name, db_router.vm.vmname, db_router.manage_ip)
 
-    conn = config.get_apiclient(db_router.manage_ip)
+    '''
+    #conn = config.get_apiclient(db_router.manage_ip)
 
 
     intf = db_router.intfs[ROUTER_INTF]
@@ -384,7 +359,7 @@ def main():
     db_router.del_address_entry(conn, 'xxxxx')
 
     conn.request(templates.DEL_SUB_INTF, intf_name=sub_intf.inner_name, id=sub_intf.inner_id)
-
+    '''
     #db_router.del_router()
 
 

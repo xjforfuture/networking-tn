@@ -231,6 +231,60 @@ DEL_ADDRESS_ENTRY = """
 }
 """
 
+ADD_SERVICE_ENTRY = """
+{
+    "path": "/api/system_service?vdom=root",
+    "method": "POST",
+    "body": {
+        {% if desc is defined %}
+            "description":"{{ desc }}",
+        {% else %}
+            "description":"",
+        {% endif %}
+        
+        "member": [
+                {
+                    "destination_port_max":"{{ dst_port_max }}",
+                    "destination_port_min":"{{ dst_port_min }}",
+                    "protocol":"{{ protocol }}",
+                    "source_port_max":"{{ src_port_max }}",
+                    "source_port_min":"{{ src_port_min }}"
+                }
+            ],
+        
+        "mkey":"{{ name }}"
+    }
+}
+"""
+
+DEL_SERVICE_ENTRY = """
+{
+    "path": "/api/system_service?vdom=root",
+    "method": "DELETE",
+    "body": {
+        {% if desc is defined %}
+            "description":"{{ desc }}",
+        {% else %}
+            "description":"",
+        {% endif %}
+        
+        "member": [
+                {
+                    "destination_port_max":"{{ dst_port_max }}",
+                    "destination_port_min":"{{ dst_port_min }}",
+                    "protocol":"{{ protocol }}",
+                    "source_port_max":"{{ src_port_max }}",
+                    "source_port_min":"{{ src_port_min }}"
+                }
+            ],
+        
+        "mkey":"{{ name }}",
+        "predefine": 0
+    }
+}
+"""
+
+
 ADD_ADDRESS_SNAT = """
 {
     "path": "/api/policy_nat_source_nat/?vdom=root",
@@ -314,13 +368,8 @@ ADD_RULE = """
             "description":"{{ desc }}",
         {% endif %}
         
-        {% if daddrs is defined %}
-            "daddr": [
-                {% for daddr in daddrs[:-1] %}
-                    "{{ daddr }}",
-                {% endfor %}
-                "{{ daddrs[-1] }}"
-            ],
+        {% if daddr is defined %}
+            "daddr": ["{{ daddr }}"],
         {% else %}
             "daddr":["Any"],
         {% endif %}
@@ -337,13 +386,8 @@ ADD_RULE = """
             "dzone":"trust",
         {% endif %}
             
-        {% if saddrs is defined %}
-            "saddr": [
-                {% for saddr in saddrs[:-1] %}
-                    "{{ saddr }}",
-                {% endfor %}
-                "{{ saddrs[-1] }}"
-            ],
+        {% if saddr is defined %}
+            "saddr": ["{{ saddr }}"],
         {% else %}
             "saddr":["Any"],
         {% endif %}
@@ -354,13 +398,8 @@ ADD_RULE = """
             "serGroup":"address",
         {% endif %}
             
-        {% if services is defined %}
-            "service": [
-                {% for service in services[:-1] %}
-                    "{{ service }}",
-                {% endfor %}
-                "{{ services[-1] }}"
-            ],
+        {% if service is defined %}
+            "service": ["{{ service }}"],
         {% else %}
             "service":["Any"],
         {% endif %}    
@@ -377,6 +416,66 @@ ADD_RULE = """
             "status":"enable",
         {% endif %}        
         
+        {% if szone is defined %}
+            "szone":"{{ szone }}"
+        {% else %}
+            "szone":"trust"
+        {% endif %}
+    }
+}
+"""
+
+DEL_RULE = """
+{
+    "path": "/api/policy_security_rule?vdom=root",
+    "method": "DELETE",
+    "body": {
+        "id":"{{ id }}",
+        "action":"{{ action }}",
+        "mkey":"{{ name }}",
+
+        {% if desc is defined %}
+            "description":"{{ desc }}",
+        {% endif %}
+
+        {% if daddr is defined %}
+            "daddr": ["{{ daddr }}"],
+        {% else %}
+            "daddr":["Any"],
+        {% endif %}
+
+        "daddrgroup":[],
+
+        {% if dzone is defined %}
+            "dzone":"{{ dzone }}",
+        {% else %}
+            "dzone":"trust",
+        {% endif %}
+
+        {% if saddr is defined %}
+            "saddr": ["{{ saddr }}"],
+        {% else %}
+            "saddr":["Any"],
+        {% endif %}
+
+        "saddrgroup":[],
+
+        {% if service is defined %}
+            "service": ["{{ service }}"],
+        {% else %}
+            "service":["Any"],
+        {% endif %}    
+        
+        "servicegroup":[],
+        
+        "sched":[],
+
+        {% if status is defined %}
+            "status":"{{ status }}",
+        {% else %}
+            "status":"enable",
+        {% endif %}        
+
         {% if szone is defined %}
             "szone":"{{ szone }}"
         {% else %}

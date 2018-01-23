@@ -42,6 +42,7 @@ DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 
 LOG = logging.getLogger(__name__)
 
+
 def neutron_to_tnos(id):
     return id[:16]
 
@@ -59,7 +60,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         self.task_manager = tasks.TaskManager()
         self.task_manager.start()
         self.tn_init()
-        self.clients = {}
 
     def tn_init(self):
         """Fortinet specific initialization for this class."""
@@ -68,16 +68,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         #self._driver = config.get_apiclient()
 
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
-
-    def get_tn_client(self, router_id):
-
-        if self.clients.has_key(router_id):
-            return self.clients[router_id]
-
-        tn_router = tnos.get_tn_router(router_id)
-        self.clients[router_id] = config.get_apiclient(tn_router.manage_ip)
-
-        return self.clients[router_id]
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -96,8 +86,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         try:
             tn_router = tnos.TnosRouter(context, router_id, tenant_id, router_name, self._tn_info["image_path"], self._tn_info['address'])
-            self.clients[router_id] = config.get_apiclient(tn_router.manage_ip)
-            tn_router.get_intf_info(self.clients[router_id])
+            tn_client = tnos.get_tn_client(router_id)
+            tn_router.get_intf_info(tn_client)
             tn_router.store_router()
             #router_db = tn_db.Tn_Router_Db.add_record(context, id=router_name, name=router_name, tenant_id=tenant_id)
 
@@ -154,7 +144,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         if tn_router == None:
             LOG.debug('tn_router is none')
 
-        client = self.get_tn_client(router_id)
+        client = tnos.get_tn_client(router_id)
         if client == None:
             LOG.debug('client is none')
 
@@ -261,7 +251,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         if tn_router == None:
             LOG.debug('tn_router is none')
 
-        client = self.get_tn_client(router_id)
+        client = tnos.get_tn_client(router_id)
 
         if client == None:
             LOG.debug('client is none')
@@ -295,7 +285,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
     def __remove_tn_router_interface(self, context, router_id, port_id=None, is_gw=False):
         tn_router = tnos.get_tn_router(router_id=router_id)
-        client = self.get_tn_client(router_id)
+        client = tnos.get_tn_client(router_id)
 
         if is_gw:
             tn_intf = tn_router.get_router_gw_intf()
