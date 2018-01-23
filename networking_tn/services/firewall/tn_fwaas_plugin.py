@@ -322,11 +322,15 @@ class FirewallPlugin(
 
         try:
             for router_id in fw_with_rules['add-router-ids']:
-                tn_fw.apply_to_router(router_id, True)
+                LOG.debug('router %s', router_id)
+                tn_fw.add_apply_to_router(router_id)
         except:
-            pass
-            #raise Exception
+            self.delete_firewall(context, fw['id'])
+            raise
+        else:
+            firewall['firewall']['status'] = nl_constants.ACTIVE
         finally:
+            #todo xiongjun :will be delete
             firewall['firewall']['status'] = nl_constants.ACTIVE
 
         return fw

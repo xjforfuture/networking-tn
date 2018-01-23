@@ -151,8 +151,8 @@ class TnosRouter(object):
         self.vm.destroy()
         tn_db.tn_db_del('router'+self.router_id)
 
-    def store_router(self, router_obj):
-        tn_db.tn_db_modify('router'+self.router_id, router_obj)
+    def store_router(self):
+        tn_db.tn_db_modify('router'+self.router_id, self)
 
     def init_intf(self, context, manage_ip):
         self.intfs = []

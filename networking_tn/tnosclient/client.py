@@ -139,10 +139,14 @@ class FortiosApiClient(eventlet_client.EventletApiClient):
             return None
 
         if url == jsonutils.loads(templates.LOGOUT)['path']:
+
             return response.body
         else:
             try:
-                return jsonutils.loads(response.body)
+                result = jsonutils.loads(response.body)
+                if result['status']['message'] != 'OK':
+                    raise exception.BadRequest()
+                return result
             except UnicodeDecodeError:
                 LOG.debug("The following strings cannot be decoded with "
                           "'utf-8, trying 'ISO-8859-1' instead. %(body)s",

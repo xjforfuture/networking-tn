@@ -4,7 +4,7 @@ from oslo_log import log as logging
 from networking_tn.db import tn_db
 from networking_tn.tnosclient import templates
 from networking_tn.tnosclient import tnos_router as tnos
-from networking_tn.tnosclient.tnos_router import *
+#from networking_tn.tnosclient.tnos_router import *
 
 if __name__ == '__main__':
     sys.path.append(r'/home/xiongjun/work/networking-tn/')
@@ -32,7 +32,8 @@ class TNL3Address(object):
 
     def add_apply(self, client):
         if self.name != ADDR_ANY.name:
-            client.request(templates.ADD_ADDRESS_ENTRY, name=self.name, ip_prefix=self.ip_prefix)
+            rlt = client.request(templates.ADD_ADDRESS_ENTRY, name=self.name, ip_prefix=self.ip_prefix)
+            LOG.debug(rlt['status']['message'])
 
     def del_apply(self, client):
         if self.name != ADDR_ANY.name:
@@ -141,6 +142,7 @@ class TNRule(object):
             self.service = TNService(self.name+'-svc', self.protocol, rule_dict['source_port'], rule_dict['destination_port'])
 
     def add_apply(self, client):
+        LOG.debug('trace')
         self.src_addr.add_apply(client)
         self.dst_addr.add_apply(client)
         self.service.add_apply(client)
@@ -215,7 +217,6 @@ class TNFirewall(object):
         tn_db.tn_db_del('firewall' + firewall_id)
 
     def store(self):
-        LOG.debug('trace')
         tn_db.tn_db_modify('firewall'+str(self.id), self)
 
     def add_policy(self, policy_id, name=None, desc=None):
@@ -230,14 +231,16 @@ class TNFirewall(object):
         self.policy = None
 
     def add_apply_to_router(self, router_id):
+        LOG.debug('trace')
         if router_id not in self.router_ids:
             self.router_ids.append(router_id)
             client = tnos.get_tn_client(router_id)
             if client != None:
+                LOG.debug('trace')
                 for rule in self.policy.rules:
                     rule.add_apply(client)
             else:
-                print('client is None')
+                LOG.debug('trace')
 
     def del_apply_to_router(self, router_id):
         if router_id in self.router_ids:
@@ -247,7 +250,7 @@ class TNFirewall(object):
                 for rule in self.policy.rules:
                     rule.del_apply(client)
             else:
-                print('client is None')
+                LOG.debug('trace')
 
 def main():
 
@@ -285,7 +288,7 @@ def main():
 
     tn_firewall = get_tn_fw('0a70bcd8-66cb-4235-b8b4-7dda9a3256bf')
     tn_firewall.add_apply_to_router('1234567890')
-    tn_firewall.del_apply_to_router('1234567890')
+    #tn_firewall.del_apply_to_router('1234567890')
 
 if __name__ == '__main__':
     main()
