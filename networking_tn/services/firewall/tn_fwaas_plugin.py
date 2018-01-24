@@ -143,7 +143,7 @@ class FirewallAgentApi(object):
                    host=self.host)
 
 
-class FirewallPlugin(
+class TNFirewallPlugin(
     firewall_db.Firewall_db_mixin,
     firewall_router_insertion_db.FirewallRouterInsertionDbMixin):
     """Implementation of the Neutron Firewall Service Plugin.
