@@ -318,11 +318,13 @@ class TnosRouter(object):
     def add_address_snat(self, api_client, id, saddr, trans_addr):
         api_client.request(templates.ADD_ADDRESS_SNAT, id=id, saddr=saddr, trans_addr=trans_addr)
 
+    '''
     def add_rule(self, api_client, **msg):
         api_client.request(templates.ADD_RULE, **msg)
 
     def add_default_permit_rule(self, api_client, **msg):
         self.add_rule(api_client, id='1', action='permit', **msg)
+    '''
 
 
 def main():

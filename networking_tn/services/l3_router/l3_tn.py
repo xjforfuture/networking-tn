@@ -65,7 +65,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         """Fortinet specific initialization for this class."""
         LOG.debug("TNL3ServicePlugin_init")
         self._tn_info = config.tn_info
-        #self._driver = config.get_apiclient()
 
         self.enable_fwaas = 'fwaas_fortinet' in cfg.CONF.service_plugins
 
@@ -132,10 +131,10 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 port = db.get_port(context, port_id)
                 ips = updated['external_gateway_info']['external_fixed_ips']
                 ip = ips[0]['ip_address']
-                self.__add_tn_router_interface(context, router_id, port, ip)
+                self._add_tn_router_interface(context, router_id, port, ip)
         else:
             # del gatewayl
-            self.__remove_tn_router_interface(context, router_id, is_gw=True)
+            self._remove_tn_router_interface(context, router_id, is_gw=True)
 
     def __update_tn_router_route(self, router_id, routes):
         tn_router = tnos.get_tn_router(router_id=router_id)
@@ -234,7 +233,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             raise Exception(_("TNL3ServicePlugin:adding redundant "
                               "router interface is not supported"))
         try:
-            self.__add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
+            self._add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
         except Exception as e:
             LOG.error(_LE("Failed to create TN resources to add "
                         "router interface. info=%(info)s, "
@@ -246,7 +245,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                              interface_info)
         return info
 
-    def __add_tn_router_interface(self, context, router_id, port, ip):
+    def _add_tn_router_interface(self, context, router_id, port, ip):
         tn_router = tnos.get_tn_router(router_id=router_id)
         if tn_router == None:
             LOG.debug('tn_router is none')
@@ -279,11 +278,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
 
-        self.__remove_tn_router_interface(context, router_id, port_id=interface_info['port_id'])
+        self._remove_tn_router_interface(context, router_id, port_id=interface_info['port_id'])
 
         return info
 
-    def __remove_tn_router_interface(self, context, router_id, port_id=None, is_gw=False):
+    def _remove_tn_router_interface(self, context, router_id, port_id=None, is_gw=False):
         tn_router = tnos.get_tn_router(router_id=router_id)
         client = tnos.get_tn_client(router_id)
 

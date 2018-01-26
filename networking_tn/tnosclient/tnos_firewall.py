@@ -370,9 +370,11 @@ def main():
     }
     tn_firewall.add_rule_apply(rule_info)
 
-    tn_firewall.move_rule_apply('5683780b-77d3-4d1b-acb7-4360b7f48349',
-                                  '5683780b-77d3-4d1b-acb7-4360b7f48347',
-                                  TNOS_INSERT_RULE_ACTION['insert_before'])
+    #tn_firewall.move_rule_apply('5683780b-77d3-4d1b-acb7-4360b7f48349',
+    #                              '5683780b-77d3-4d1b-acb7-4360b7f48347',
+    #                              TNOS_INSERT_RULE_ACTION['insert_before'])
+
+    tn_firewall.remove_rule_apply(rule_info['id'])
 
     #tn_firewall.unapply_to_router('1234567890')
 
