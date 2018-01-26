@@ -328,7 +328,7 @@ class TnosRouter(object):
 def main():
     tn_router = TnosRouter(None, '1234567890', '55', '66', '/opt/stack/tnos/tnos.qcow2', '80.1.1.1')
 
-    tn_router.store_router(tn_router)
+    tn_router.store_router()
     #db_router = get_tn_router('1234567890')
     #print(db_router.name, db_router.vm.vmname, db_router.manage_ip)
 

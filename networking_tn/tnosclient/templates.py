@@ -485,6 +485,18 @@ DEL_RULE = """
 }
 """
 
+MOVE_RULE = """
+{
+    "path": "/api/policy_security_rule/move/move?vdom=root&srcKey={{ srcKey }}&move_act={{ action }}&dstKey={{ dstKey }}",
+    "method": "PUT",
+    "body": {
+        "dst":"{{ dstKey }}",
+        "src":"{{ srcKey }}",
+        "move_act":"{{ action }}",
+        "_id":"move"
+    }
+}
+"""
 
 
 

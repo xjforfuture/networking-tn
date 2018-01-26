@@ -195,7 +195,7 @@ class TNFirewallPlugin(
     def _rpc_update_firewall(self, context, firewall_id):
         LOG.debug('trace')
         status_update = {"firewall": {"status": nl_constants.PENDING_UPDATE}}
-        super(FirewallPlugin, self).update_firewall(context, firewall_id,
+        super(TNFirewallPlugin, self).update_firewall(context, firewall_id,
                                                     status_update)
         fw_with_rules = self._make_firewall_dict_with_rules(context,
                                                             firewall_id)
@@ -278,12 +278,12 @@ class TNFirewallPlugin(
             # no messaging to agent needed, and fw needs to go
             # to INACTIVE(no associated rtrs) state.
             status = nl_constants.INACTIVE
-            fw = super(FirewallPlugin, self).create_firewall(
+            fw = super(TNFirewallPlugin, self).create_firewall(
                 context, firewall, status)
             fw['router_ids'] = []
             return fw
         else:
-            fw = super(FirewallPlugin, self).create_firewall(
+            fw = super(TNFirewallPlugin, self).create_firewall(
                 context, firewall)
             fw['router_ids'] = fw_new_rtrs
 
@@ -298,40 +298,26 @@ class TNFirewallPlugin(
 
         LOG.debug(fw_with_rules)
 
-        '''
-        {'status': u'PENDING_CREATE', 'description': u'5555',
-         'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc', 'del-router-ids': [],
-         'id': u'0a70bcd8-66cb-4235-b8b4-7dda9a3256bf', 'router_ids': [], 'name': u'test-firewall-5',
-         'admin_state_up': True, 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19',
-         'add-router-ids': [u'afca6971-49ff-4b1f-a3a1-ec8cc1a633d0'], 'shared': None,
-         'project_id': u'38f7e18b122949f39473e8c6d76aae19', 'firewall_rule_list': [
-            {'protocol': u'tcp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
-             'destination_ip_address': None, 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
-             'position': 1, 'destination_port': None, 'id': u'5683780b-77d3-4d1b-acb7-4360b7f48349',
-             'name': u'test-rule-2', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
-             'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'}]}
-        '''
-
         tn_fw = tnos_fw.TNFirewall(fw_with_rules['id'], fw_with_rules['name'], fw_with_rules['description'])
         tn_policy = tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
         rules = fw_with_rules['firewall_rule_list']
-        for rule in rules:
-            tn_policy.add_rule(rule)
 
-        tn_fw.store()
+        if tn_policy.rules == []:
+            LOG.debug('trace')
+            for rule in rules:
+                LOG.debug('trace')
+                tn_policy.add_rule(rule)
 
         try:
             for router_id in fw_with_rules['add-router-ids']:
                 LOG.debug('router %s', router_id)
-                tn_fw.add_apply_to_router(router_id)
+                tn_fw.apply_to_router(router_id)
         except:
             self.delete_firewall(context, fw['id'])
             raise
         else:
-            firewall['firewall']['status'] = nl_constants.ACTIVE
-        finally:
-            #todo xiongjun :will be delete
-            firewall['firewall']['status'] = nl_constants.ACTIVE
+            self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
+            tn_fw.store()
 
         return fw
 
@@ -359,13 +345,13 @@ class TNFirewallPlugin(
             # no messaging to agent needed, and we need to continue
             # in INACTIVE state
             firewall['firewall']['status'] = nl_constants.INACTIVE
-            fw = super(FirewallPlugin, self).update_firewall(
+            fw = super(TNFirewallPlugin, self).update_firewall(
                 context, id, firewall)
             fw['router_ids'] = []
             return fw
         else:
             firewall['firewall']['status'] = nl_constants.PENDING_UPDATE
-            fw = super(FirewallPlugin, self).update_firewall(
+            fw = super(TNFirewallPlugin, self).update_firewall(
                 context, id, firewall)
             fw['router_ids'] = fw_new_rtrs
 
@@ -380,21 +366,80 @@ class TNFirewallPlugin(
         # last-router drives agent to ack with status to set state to INACTIVE
         fw_with_rules['last-router'] = not fw_new_rtrs
 
-        LOG.debug("update_firewall %s: Add Routers: %s, Del Routers: %s",
-                  fw['id'],
-                  fw_with_rules['add-router-ids'],
-                  fw_with_rules['del-router-ids'])
+        LOG.debug(fw_with_rules)
 
-        hosts = self._get_hosts_to_notify(context, list(
-            set(fw_new_rtrs).union(set(fw_current_rtrs))))
-        for host in hosts:
-            self.agent_rpc.update_firewall(context, fw_with_rules,
-                                           host=host)
+        '''
+            {'status': u'PENDING_CREATE', 'description': u'5555',
+             'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc', 'del-router-ids': [],
+             'id': u'0a70bcd8-66cb-4235-b8b4-7dda9a3256bf', 'router_ids': [], 'name': u'test-firewall-5',
+             'admin_state_up': True, 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19',
+             'add-router-ids': [u'afca6971-49ff-4b1f-a3a1-ec8cc1a633d0'], 'shared': None,
+             'project_id': u'38f7e18b122949f39473e8c6d76aae19', 'firewall_rule_list': [
+                {'protocol': u'tcp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
+                 'destination_ip_address': None, 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
+                 'position': 1, 'destination_port': None, 'id': u'5683780b-77d3-4d1b-acb7-4360b7f48349',
+                 'name': u'test-rule-2', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
+                 'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'}]}
+        '''
+
+        tn_fw = tnos_fw.get_tn_fw(id)
+        tn_fw.name = fw_with_rules['name']
+        tn_fw.desc = fw_with_rules['description']
+
+        LOG.debug("%s  %s  ", tn_fw.policy_id, fw_with_rules['firewall_policy_id'])
+        if tn_fw.policy_id != fw_with_rules['firewall_policy_id']:
+
+            try:
+                for router_id in fw_with_rules['router_ids']:
+                    LOG.debug('router %s', router_id)
+                    tn_fw.unapply_to_router(router_id)
+
+                old_policy = tnos_fw.get_tn_policy(tn_fw.policy_id)
+                old_policy.firewall_id.remove(id)
+                if old_policy.firewall_id == []:
+                    old_policy.delete()
+
+                new_policy = tnos_fw.get_tn_policy(fw_with_rules['project_id'])
+                if new_policy == None:
+                    tn_policy = tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
+                    rules = fw_with_rules['firewall_rule_list']
+                    for rule in rules:
+                        tn_policy.add_rule(rule)
+                else:
+                    tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
+
+                for router_id in fw_with_rules['router_ids']:
+                    LOG.debug('router %s', router_id)
+                    tn_fw.apply_to_router(router_id)
+
+            except:
+                self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ERROR)
+                raise
+            else:
+                self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
+                tn_fw.store()
+
+        else:
+            try:
+                for router_id in fw_with_rules['add-router-ids']:
+                    LOG.debug('router %s', router_id)
+                    tn_fw.apply_to_router(router_id)
+
+                for router_id in fw_with_rules['del-router-ids']:
+                    LOG.debug('router %s', router_id)
+                    tn_fw.unapply_to_router(router_id)
+            except:
+                self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ERROR)
+                raise
+            else:
+                self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
+                tn_fw.store()
+
         return fw
 
     def delete_db_firewall_object(self, context, id):
         LOG.debug('trace')
-        super(FirewallPlugin, self).delete_firewall(context, id)
+        super(TNFirewallPlugin, self).delete_firewall(context, id)
 
     def delete_firewall(self, context, id):
         LOG.debug("delete_firewall() called on firewall %s", id)
@@ -408,35 +453,54 @@ class TNFirewallPlugin(
             self.delete_db_firewall_object(context, id)
         else:
             status = {"firewall": {"status": nl_constants.PENDING_DELETE}}
-            super(FirewallPlugin, self).update_firewall(context, id, status)
+            super(TNFirewallPlugin, self).update_firewall(context, id, status)
             # Reflect state change in fw_with_rules
             fw_with_rules['status'] = status['firewall']['status']
-            hosts = self._get_hosts_to_notify(context, fw_delete_rtrs)
-            if hosts:
-                for host in hosts:
-                    self.agent_rpc.delete_firewall(context, fw_with_rules,
-                                                   host=host)
+
+            tn_fw = tnos_fw.get_tn_fw(id)
+            try:
+                for router_id in fw_with_rules['del-router-ids']:
+                    LOG.debug('router %s', router_id)
+                    tn_fw.unapply_to_router(router_id)
+            except:
+                self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ERROR)
+                raise
             else:
-                # NOTE(blallau): we directly delete the firewall
-                # if router is not associated to an agent
+                self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
+                tn_fw.delete()
                 self.delete_db_firewall_object(context, id)
 
+    '''
     def update_firewall_policy(self, context, id, firewall_policy):
         LOG.debug("update_firewall_policy() called")
         self._ensure_update_firewall_policy(context, id)
-        fwp = super(FirewallPlugin,
+        fwp = super(TNFirewallPlugin,
                     self).update_firewall_policy(context, id, firewall_policy)
         self._rpc_update_firewall_policy(context, id)
         return fwp
+    '''
 
     def update_firewall_rule(self, context, id, firewall_rule):
         LOG.debug("update_firewall_rule() called")
         self._ensure_update_firewall_rule(context, id)
-        fwr = super(FirewallPlugin,
+        fwr = super(TNFirewallPlugin,
                     self).update_firewall_rule(context, id, firewall_rule)
         firewall_policy_id = fwr['firewall_policy_id']
         if firewall_policy_id:
-            self._rpc_update_firewall_policy(context, firewall_policy_id)
+            firewall_policy = self.get_firewall_policy(context, firewall_policy_id)
+            if firewall_policy and 'firewall_list' in firewall_policy:
+                for firewall_id in firewall_policy['firewall_list']:
+                    tn_fw = tnos_fw.get_tn_fw(firewall_id)
+                    if tn_fw != None:
+                        self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
+                        try:
+                            tn_fw.update_rule_apply(rule_id)
+                        except:
+                            self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
+                        else:
+                            self.update_firewall_status(context, firewall_id, nl_constants.ACTIVE)
+                            tn_fw.store()
+
         return fwr
 
     def _notify_firewall_updates(self, context, resource, update_info):
@@ -447,9 +511,52 @@ class TNFirewallPlugin(
     def insert_rule(self, context, id, rule_info):
         LOG.debug("insert_rule() called")
         self._ensure_update_firewall_policy(context, id)
-        fwp = super(FirewallPlugin,
+        fwp = super(TNFirewallPlugin,
                     self).insert_rule(context, id, rule_info)
-        self._rpc_update_firewall_policy(context, id)
+
+        LOG.debug(rule_info)
+        LOG.debug(fwp)
+        '''
+        {u'insert_after': u'', u'firewall_rule_id': u'78640109-d983-4f3a-9d10-06f755379d8d',
+         u'insert_before': u'8e591066-d030-40b3-a852-97de7c30e3eb'}
+        
+
+        {'name': u'test-policy-1',
+         'firewall_rules': [u'ab0890d9-69ee-480e-a1a1-c3dba97ab80a', u'5f58cbf1-3ad0-422c-a43e-bf0aa3d297ef'],
+         'shared': False, 'audited': False, 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19',
+         'project_id': u'38f7e18b122949f39473e8c6d76aae19', 'id': u'1c135a47-e536-42be-afd9-f0a5bc3afd30',
+         'firewall_list': [u'b37974c7-6453-4dcd-9aa5-5e78d94bb660'], 'description': u'test-policy-1-desc'}
+        '''
+
+        new_rule = self.get_firewall_rule(context, rule_info['firewall_rule_id'])
+
+        firewall_policy = self.get_firewall_policy(context, id)
+        if firewall_policy and 'firewall_list' in firewall_policy:
+            for firewall_id in firewall_policy['firewall_list']:
+                tn_fw = tnos_fw.get_tn_fw(firewall_id)
+
+                if tn_fw != None:
+                    self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
+                    try:
+                        tn_fw.add_rule_apply(new_rule)
+
+                        if len(rule_info['insert_before']) != 0:
+                            tn_fw.move_rule_apply(rule_info['firewall_rule_id'],
+                                                    rule_info['insert_before'],
+                                                    tnos_fw.TNOS_INSERT_RULE_ACTION['insert_before'])
+
+                        if len(rule_info['insert_after']) != 0:
+                            tn_fw.move_rule_apply(rule_info['firewall_rule_id'],
+                                                    rule_info['insert_after'],
+                                                    tnos_fw.TNOS_INSERT_RULE_ACTION['insert_after'])
+                    except:
+                        self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
+                    else:
+                        self.update_firewall_status(context, firewall_id, nl_constants.ACTIVE)
+                        tn_fw.store()
+
+        #self._rpc_update_firewall_policy(context, id)
+
         resource = 'firewall_policy.update.insert_rule'
         self._notify_firewall_updates(context, resource, rule_info)
         return fwp
@@ -457,9 +564,25 @@ class TNFirewallPlugin(
     def remove_rule(self, context, id, rule_info):
         LOG.debug("remove_rule() called")
         self._ensure_update_firewall_policy(context, id)
-        fwp = super(FirewallPlugin,
+        fwp = super(TNFirewallPlugin,
                     self).remove_rule(context, id, rule_info)
-        self._rpc_update_firewall_policy(context, id)
+
+        rule_id = rule_info['firewall_rule_id']
+
+        firewall_policy = self.get_firewall_policy(context, id)
+        if firewall_policy and 'firewall_list' in firewall_policy:
+            for firewall_id in firewall_policy['firewall_list']:
+                tn_fw = tnos_fw.get_tn_fw(firewall_id)
+                if tn_fw != None:
+                    self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
+                    try:
+                        tn_fw.remove_rule_apply(rule_id)
+                    except:
+                        self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
+                    else:
+                        self.update_firewall_status(context, firewall_id, nl_constants.ACTIVE)
+                        tn_fw.store()
+
         resource = 'firewall_policy.update.remove_rule'
         self._notify_firewall_updates(context, resource, rule_info)
         return fwp
@@ -469,7 +592,7 @@ class TNFirewallPlugin(
         has_id_field = not fields or 'id' in fields
         if not has_id_field:
             fields = fields + ['id']
-        fw_list = super(FirewallPlugin, self).get_firewalls(
+        fw_list = super(TNFirewallPlugin, self).get_firewalls(
             context, filters, fields)
         if not fields or 'router_ids' in fields:
             for fw in fw_list:
@@ -481,7 +604,7 @@ class TNFirewallPlugin(
 
     def get_firewall(self, context, id, fields=None):
         LOG.debug("fwaas get_firewall() called")
-        res = super(FirewallPlugin, self).get_firewall(
+        res = super(TNFirewallPlugin, self).get_firewall(
             context, id, fields)
         fw_current_rtrs = self.get_firewall_routers(context, id)
         res['router_ids'] = fw_current_rtrs

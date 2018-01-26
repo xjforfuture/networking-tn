@@ -4,7 +4,7 @@ from oslo_log import log as logging
 from networking_tn.db import tn_db
 from networking_tn.tnosclient import templates
 from networking_tn.tnosclient import tnos_router as tnos
-#from networking_tn.tnosclient.tnos_router import *
+from networking_tn.tnosclient.tnos_router import *
 
 if __name__ == '__main__':
     sys.path.append(r'/home/xiongjun/work/networking-tn/')
@@ -21,8 +21,21 @@ TNOS_ACTION = {'allow':'permit',
                'deny':'deny',
                'reject':'deny'}
 
+TNOS_INSERT_RULE_ACTION = {'insert_after':'after', 'insert_before':'before'}
+
+TN_POLICIES = {}
+
 def get_tn_fw(fw_id):
     return tn_db.tn_db_get('firewall'+str(fw_id))
+
+def get_tn_policy(policy_id):
+    try:
+        return TN_POLICIES[policy_id]
+    except:
+        policy = tn_db.tn_db_get('policy' + str(policy_id))
+        if policy != None:
+            TN_POLICIES[policy_id] = policy
+            return policy
 
 
 class TNL3Address(object):
@@ -32,8 +45,7 @@ class TNL3Address(object):
 
     def add_apply(self, client):
         if self.name != ADDR_ANY.name:
-            rlt = client.request(templates.ADD_ADDRESS_ENTRY, name=self.name, ip_prefix=self.ip_prefix)
-            LOG.debug(rlt['status']['message'])
+            client.request(templates.ADD_ADDRESS_ENTRY, name=self.name, ip_prefix=self.ip_prefix)
 
     def del_apply(self, client):
         if self.name != ADDR_ANY.name:
@@ -151,7 +163,7 @@ class TNRule(object):
                        daddr=self.dst_addr.name, saddr=self.src_addr.name, service=self.service.name, status=self.enable)
 
     def del_apply(self, client):
-        print('del rule')
+        LOG.debug('trace')
         client.request(templates.DEL_RULE, id=self.inner_id, name=self.name, action=self.action, desc=self.desc,
                        daddr=self.dst_addr.name, saddr=self.src_addr.name, service=self.service.name,
                        status=self.enable)
@@ -174,6 +186,14 @@ class TNPolicy(object):
         self.firewall_id = []
         self.rule_inner_use = []
 
+    def delete(self):
+        del TN_POLICIES[self.id]
+        tn_db.tn_db_del('policy'+str(self.id))
+
+    def store(self):
+        TN_POLICIES[self.id] = self
+        tn_db.tn_db_modify('policy'+str(self.id), self)
+
     def add_rule(self, rule_dict):
         for i in range(TNOS_RULE_ID_MIN, TNOS_RULE_ID_MAX+1):
             if i not in self.rule_inner_use:
@@ -189,11 +209,23 @@ class TNPolicy(object):
         if rule != None:
             self.rules.remove(rule)
 
-    def move_rule(self, src_rule_id, dst_rule_id, flag):
-        pass
+    def insert_rule_apply(self, client, src_rule_id, dst_rule_id, action):
 
-    def insert_rule(self):
-        pass
+        src = self.get_rule(src_rule_id)
+        dst = self.get_rule(dst_rule_id)
+        client.request(templates.MOVE_RULE, srcKey=src.inner_id, dstKey=dst.inner_id, action=action)
+        self.rules.remove(src)
+        dst_index = self.rules.index(dst)
+        if action == TNOS_INSERT_RULE_ACTION['insert_before']:
+            self.rules.insert(dst_index,src)
+        if action == TNOS_INSERT_RULE_ACTION['insert_after']:
+            self.rules.insert(dst_index+1,src)
+
+    def remove_rule_apply(self, client, rule_id):
+        rule = self.get_rule(rule_id)
+        if rule != None:
+            rule.del_apply(client)
+            self.del_rule(rule_id)
 
     def get_rule(self, rule_id):
         for rule in self.rules:
@@ -206,51 +238,100 @@ class TNFirewall(object):
         self.id = id
         self.name = name
         self.desc = desc
-        self.policy = None
+        self.policy_id = None
         self.router_ids = []
 
-    @staticmethod
-    def get(firewall_id):
-        return tn_db.tn_db_get('firewall' + firewall_id)
+    def delete(self):
+        policy = get_tn_policy(self.policy_id)
+        if policy != None:
+            policy.firewall_id.remove(self.id)
+            if policy.firewall_id == []:
+                policy.delete()
 
-    def delete(self, firewall_id):
-        tn_db.tn_db_del('firewall' + firewall_id)
+        tn_db.tn_db_del('firewall'+str(self.id))
 
     def store(self):
+        policy = get_tn_policy(self.policy_id)
+        if policy != None:
+            policy.store()
+
         tn_db.tn_db_modify('firewall'+str(self.id), self)
 
     def add_policy(self, policy_id, name=None, desc=None):
-        policy = TNPolicy(policy_id, name, desc)
+        policy = get_tn_policy(policy_id)
+        if policy == None:
+            policy = TNPolicy(policy_id, name, desc)
         policy.firewall_id.append(self.id)
-        self.policy = policy
+        self.policy_id = policy_id
+        policy.store()
         return policy
 
     def del_policy(self):
-        policy = self.policy
-        policy.firewall_id.remove(self.id)
-        self.policy = None
+        policy = get_tn_policy(self.policy_id)
+        if policy != None:
+            self.policy_id = None
+            policy.firewall_id.remove(self.id)
+            if policy.firewall_id == []:
+                policy.delete()
 
-    def add_apply_to_router(self, router_id):
-        LOG.debug('trace')
+    def apply_to_router(self, router_id):
         if router_id not in self.router_ids:
             self.router_ids.append(router_id)
             client = tnos.get_tn_client(router_id)
             if client != None:
-                LOG.debug('trace')
-                for rule in self.policy.rules:
-                    rule.add_apply(client)
+                policy = get_tn_policy(self.policy_id)
+                if policy != None:
+                    for rule in policy.rules:
+                        rule.add_apply(client)
             else:
-                LOG.debug('trace')
+                LOG.debug('error')
 
-    def del_apply_to_router(self, router_id):
+    def unapply_to_router(self, router_id):
+        LOG.debug('router ids %s', self.router_ids)
         if router_id in self.router_ids:
+            LOG.debug('trace')
             self.router_ids.remove(router_id)
             client = tnos.get_tn_client(router_id)
             if client != None:
-                for rule in self.policy.rules:
-                    rule.del_apply(client)
+                policy = get_tn_policy(self.policy_id)
+                if policy != None:
+                    for rule in policy.rules:
+                        rule.del_apply(client)
             else:
-                LOG.debug('trace')
+                LOG.debug('error')
+
+    def add_rule_apply(self, rule_dict):
+        policy = get_tn_policy(self.policy_id)
+        if policy != None:
+            rule = policy.add_rule(rule_dict)
+            for router_id in self.router_ids:
+                client = tnos.get_tn_client(router_id)
+                if client != None:
+                    rule.add_apply(client)
+                else:
+                    LOG.debug('error')
+
+    def update_rule_apply(self, rule_dict):
+        self.remove_rule_apply(rule_dict['id'])
+        self.add_rule_apply(rule_dict)
+
+    def move_rule_apply(self, src_rule_id, dst_rule_id, action):
+        for router_id in self.router_ids:
+            client = tnos.get_tn_client(router_id)
+            if client != None:
+                policy = get_tn_policy(self.policy_id)
+                policy.insert_rule_apply(client, src_rule_id, dst_rule_id, action)
+            else:
+                LOG.debug('error')
+
+    def remove_rule_apply(self, rule_id):
+        for router_id in self.router_ids:
+            client = tnos.get_tn_client(router_id)
+            if client != None:
+                policy = get_tn_policy(self.policy_id)
+                policy.remove_rule_apply(client, rule_id)
+            else:
+                LOG.debug('error')
 
 def main():
 
@@ -275,6 +356,11 @@ def main():
     }
     tn_policy.add_rule(rule_info)
 
+    tn_fw.store()
+
+    tn_firewall = get_tn_fw('0a70bcd8-66cb-4235-b8b4-7dda9a3256bf')
+    tn_firewall.apply_to_router('1234567890')
+
     rule_info = {
         'protocol': u'icmp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
         'destination_ip_address': None, 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
@@ -282,13 +368,13 @@ def main():
         'name': u'test-rule-3', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
         'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'
     }
-    tn_policy.add_rule(rule_info)
+    tn_firewall.add_rule_apply(rule_info)
 
-    tn_fw.store()
+    tn_firewall.move_rule_apply('5683780b-77d3-4d1b-acb7-4360b7f48349',
+                                  '5683780b-77d3-4d1b-acb7-4360b7f48347',
+                                  TNOS_INSERT_RULE_ACTION['insert_before'])
 
-    tn_firewall = get_tn_fw('0a70bcd8-66cb-4235-b8b4-7dda9a3256bf')
-    tn_firewall.add_apply_to_router('1234567890')
-    #tn_firewall.del_apply_to_router('1234567890')
+    #tn_firewall.unapply_to_router('1234567890')
 
 if __name__ == '__main__':
     main()
