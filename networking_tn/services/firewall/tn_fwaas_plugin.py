@@ -159,6 +159,8 @@ class TNFirewallPlugin(
     def __init__(self):
         """Do the initialization for the firewall service plugin here."""
         LOG.debug('trace')
+
+        '''
         self.start_rpc_listeners()
 
         self.agent_rpc = FirewallAgentApi(
@@ -166,6 +168,7 @@ class TNFirewallPlugin(
             cfg.CONF.host
         )
         firewall_db.subscribe()
+        '''
 
     def start_rpc_listeners(self):
         LOG.debug('trace')

@@ -33,7 +33,7 @@ class TNOSvm():
 
     kvm_cmd = 'sudo kvm -nographic -net tap,ifname=%(tap0)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap1)s,script=no -net nic ' \
-              +'-net tap,ifname=%(tap2)s,script=no -net nic %(image_path)s'
+              +'-net tap,ifname=%(tap2)s,script=no -net nic -m 1G %(image_path)s'
 
     image = 'tnos'
 

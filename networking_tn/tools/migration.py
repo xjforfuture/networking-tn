@@ -29,6 +29,7 @@ from neutron.objects.network import ExternalNetwork
 
 from oslo_db.sqlalchemy import session
 import neutron.plugins.ml2.models as ml2_db
+from neutron_fwaas.db.firewall import firewall_db
 
 sys.path.append(r'/home/xiongjun/work/networking-tn/')
 
@@ -120,18 +121,15 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
         # Limit one router per tenant
-        if not router.get('router', None):
+        router = router.get('router', None)
+        if not router:
             return
 
-        tenant_id = router['router']['tenant_id']
-        router_name = router['router']['name']
-
-        router_db = tn_db.query_record(context, l3_db.Router, name=router_name, tenant_id=tenant_id)
-        LOG.debug(router_db)
-        router_id = router_db['id']
+        router_id = router['id']
+        router_name = router['name']
 
         try:
-            tn_router = tnos.TnosRouter(context, router_id, tenant_id, router_name, self._tn_info["image_path"],
+            tn_router = tnos.TnosRouter(context, router_id, None, router_name, self._tn_info["image_path"],
                                         self._tn_info['address'])
             tn_client = tnos.get_tn_client(router_id)
             tn_router.get_intf_info(tn_client)
@@ -146,10 +144,13 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
     def add_router_interface(self, context, port):
         """creates interface on the tn device."""
         ip = port['fixed_ips'][0]['ip_address']
-        try:
-            self._add_tn_router_interface(context, router_id, port, ip)
-        except Exception as e:
-            raise
+        if '.' in ip:
+            LOG.debug(port)
+            router_id = port['device_id']
+            try:
+                self._add_tn_router_interface(context, router_id, port, ip)
+            except Exception as e:
+                raise
 
     def _get_floatingip(self, context, id):
         return tn_db.query_record(context, l3_models.FloatingIP, id=id)
@@ -198,22 +199,15 @@ class Fake_TNFirewallPlugin(fw.TNFirewallPlugin):
         else:
             tn_fw.store()
 
+    def get_firewalls(self, context):
 
-    def get_firewalls(self, context, filters=None, fields=None):
-        LOG.debug("fwaas get_firewalls() called")
-        has_id_field = not fields or 'id' in fields
-        if not has_id_field:
-            fields = fields + ['id']
-        fw_list = super(Fake_TNFirewallPlugin, self).get_firewalls(
-            context, filters, fields)
-        if not fields or 'router_ids' in fields:
-            for fw in fw_list:
-                fw['router_ids'] = self.get_firewall_routers(context, fw['id'])
-        if not has_id_field:
-            for fw in fw_list:
-                del fw['id']
+        fw_list = tn_db.query_records(context, firewall_db.Firewall)
         return fw_list
 
+    def get_rules(self, context, policy_id):
+        rule_list = tn_db.query_records(context, firewall_db.FirewallRule, firewall_policy_id=policy_id)
+
+        return rule_list
 
 def reset(dictionary):
     for key, value in dictionary.iteritems():
@@ -342,7 +336,10 @@ def firewall_migration(context, fw_plugin):
     fw_list = fw_plugin.get_firewalls(context)
 
     for fw in fw_list:
-        fw_plugin.create_firewall(context, fw)
+        rule_list = fw_plugin.get_rules(context, fw['firewall_policy_id'])
+        for rule in rule_list:
+            LOG.debug(rule)
+            #fw_plugin.create_firewall(context, rule)
 
 def floatingip_migration(context, l3_driver):
     """
@@ -387,18 +384,17 @@ def floatingip_migration(context, l3_driver):
 
 
 def main():
-    try:
+
         context = Fake_context()
-        l3_driver = Fake_TNL3ServicePlugin()
-        router_migration(context, l3_driver)
-        port_migration(context, l3_driver)
+        #l3_driver = Fake_TNL3ServicePlugin()
+        #router_migration(context, l3_driver)
+        #port_migration(context, l3_driver)
 
         fw_plugin = Fake_TNFirewallPlugin()
         firewall_migration(context, fw_plugin)
 
-    except Exception as e:
-        raise(e)
-    print "\nmigration completed.\n"
+    #except Exception as e:
+    #    raise(e)
 
 
 if __name__ == "__main__":
