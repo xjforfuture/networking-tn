@@ -497,7 +497,7 @@ class TNFirewallPlugin(
                     if tn_fw != None:
                         self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
                         try:
-                            tn_fw.update_rule_apply(rule_id)
+                            tn_fw.update_rule_apply(fwr)
                         except:
                             self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
                         else:
