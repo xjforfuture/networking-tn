@@ -77,7 +77,6 @@ def del_trunk_port_tag(context, port_name, tag):
             ovs_db.db_set('Port', port_name, ("trunks", tags)).execute(check_error=False, log_errors=True)
 
 
-
 def add_access_port_tag(context, port_name, tag):
     connect_ovs_db(context)
     port_names = []

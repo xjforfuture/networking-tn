@@ -14,14 +14,52 @@
 
 import subprocess
 import shutil
+import sys
 
+import neutron.plugins.ml2.models as ml2_db
 from oslo_log import log as logging
 
-LOG = logging.getLogger(__name__)
+if __name__ == '__main__':
+    sys.path.append(r'/home/xiongjun/work/networking-tn/')
+    LOG = logging.getLogger(None).logger
+    # LOG.addHandler(streamlog)
+    LOG.setLevel(logging.DEBUG)
+else:
+    LOG = logging.getLogger(__name__)
 
 VIRT_STATE_MAP = {'running':'running',
                   'shutdown':'shutdown',
                   'crashed':'crashed'}
+
+
+def stop_vm(id):
+    try:
+        cmd = 'sudo ps -ef'
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+        proc.wait()
+
+        cmd = 'sudo kill'
+        msg = proc.stdout.read()
+
+        msgs = msg.split('\n')
+        for msg in msgs:
+            if id in msg:
+                pid = msg.split()
+                cmd = cmd+' '+pid[1]
+
+        LOG.debug('exec cmd: %s', cmd)
+        subprocess.call(cmd, shell=True)
+    except OSError:
+        LOG.info("stop vm error")
+
+
+def destroy_vm(id, image_name):
+    stop_vm(id)
+
+    cmd = 'sudo rm ' + image_name
+    subprocess.call(cmd, shell=True)
+    LOG.debug("remove %s" % image_name)
+
 
 class TNOSvm():
     '''
@@ -31,19 +69,20 @@ class TNOSvm():
                   + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=/opt/stack/tnos/nothing '
     '''
 
-    kvm_cmd = 'sudo kvm -nographic -net tap,ifname=%(tap0)s,script=no -net nic ' \
+    kvm_cmd = 'sudo kvm -nographic -name %(id)s -net tap,ifname=%(tap0)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap1)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap2)s,script=no -net nic -m 1G %(image_path)s'
 
     image = 'tnos'
 
-    def __init__(self, vmname, source_image):
-        self.vmname = vmname
+    def __init__(self, id, priv_id, source_image):
+        self.id = id
+        self.priv_id = priv_id
         self.state = VIRT_STATE_MAP['shutdown']
         self.shell_pid = None
         self.vm_pid = None
 
-        self.image_name = TNOSvm.image + vmname
+        self.image_name = TNOSvm.image + id
         image_path = source_image.split('/')
         self.image_name = self.image_name + '.' + image_path[-1].split('.')[-1]
         image_path[-1] = self.image_name
@@ -59,8 +98,8 @@ class TNOSvm():
     def start(self, manage_intf, manage_ip):
         '''create tnos vm'''
 
-        cmd = TNOSvm.kvm_cmd % {'tap0':'tap0-'+self.vmname, 'tap1':'tap1-'+self.vmname,
-                                'tap2':'tap2-'+self.vmname, 'image_path':self.image_name}
+        cmd = TNOSvm.kvm_cmd % {'id':self.id, 'tap0':'tap0-'+self.priv_id, 'tap1':'tap1-'+self.priv_id,
+                                'tap2':'tap2-'+self.priv_id, 'image_path':self.image_name}
         LOG.debug(cmd)
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
@@ -83,31 +122,8 @@ class TNOSvm():
             self.enable_ping(proc, manage_intf)
             self.enable_telnet(proc, manage_intf)
 
-    def stop(self):
-        try:
-            cmd = 'sudo kill ' + str(self.vm_pid)
-            #cmd = 'sudo killall qemu-system-x86_64'
-            LOG.debug("exec cmd: %s" % cmd)
-            subprocess.call(cmd, shell=True)
+            return self.image_name
 
-            cmd = 'sudo kill ' + str(self.shell_pid)
-
-            LOG.debug("exec cmd: %s" % cmd)
-            subprocess.call(cmd, shell=True)
-
-            #os.kill(self.subprocess.pid+1, signal.SIGKILL)
-            self.state = VIRT_STATE_MAP['shutdown']
-
-        except OSError, e:
-            LOG.info("%s stop error" % self.vmname)
-
-    def destroy(self):
-        if self.is_running():
-            self.stop()
-
-        cmd = 'sudo rm ' + self.image_name
-        subprocess.call(cmd, shell=True)
-        LOG.debug("Destroy %s" % self.vmname)
 
     def is_running(self):
         if self.state == VIRT_STATE_MAP['running']:
@@ -115,9 +131,11 @@ class TNOSvm():
         else:
             return False
 
+
     def login(self, subprocess, username='admin', passward='admin'):
         subprocess.stdin.write(username+'\n')
         subprocess.stdin.write(passward+'\n')
+
 
     def into_interface(self, subprocess, intf_id):
         self.login(subprocess)
@@ -126,6 +144,7 @@ class TNOSvm():
         subprocess.stdin.write('config\n')
         subprocess.stdin.write('interface ethernet'+ str(intf_id) + '\n')
 
+
     def config_intf_ip(self, subprocess, intf_id, ip, mask):
         self.into_interface(subprocess, intf_id)
 
@@ -133,21 +152,26 @@ class TNOSvm():
         cmd = 'ip address '+ ip + ' ' + mask +'\n'
         subprocess.stdin.write(cmd)
 
+
     def enable_ping(self, subprocess, intf_id):
         self.into_interface(subprocess, intf_id)
         subprocess.stdin.write('manage ping\n')
+
 
     def enable_http(self, subprocess, intf_id):
         self.into_interface(subprocess, intf_id)
         subprocess.stdin.write('manage http\n')
 
+
     def enable_https(self, subprocess, intf_id):
         self.into_interface(subprocess, intf_id)
         subprocess.stdin.write('manage https\n')
 
+
     def enable_telnet(self, subprocess, intf_id):
         self.into_interface(subprocess, intf_id)
         subprocess.stdin.write('manage telnet\n')
+
 
     def display_config(self, subprocess, line_num=1024):
         flag = True
@@ -162,18 +186,8 @@ class TNOSvm():
                 if '!' in message:
                     break
 
-
 def main():
-    tnos = TNOSvm('tnos1', '/home/xiongjun/work/tnos.qcow2')
-    state = tnos.start()
-    if not state:
-        print("TNOS is not running")
+    stop_vm('6af466de-926d-4338-ba4b-a9bd54430515')
 
-    tnos.login()
-    tnos.config_intf_ip(0, '20.1.1.3', '255.255.255.0')
-    tnos.display_config()
-
-    #tnos.destroy()
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

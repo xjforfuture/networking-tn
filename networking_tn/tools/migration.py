@@ -64,11 +64,11 @@ cfg.CONF.import_group('ml2_tn', 'networking_tn.common.config')
 LOG.debug('trace')
 
 from networking_tn.common import resources
-from networking_tn.services.l3_router import l3_tn
-from networking_tn.db import models as tn_db
-from networking_tn.tnosclient import tnos_router as tnos
-from networking_tn.services.firewall import tn_fwaas_plugin as fw
-from networking_tn.tnosclient import tnos_firewall as tnos_fw
+from networking_tn.services.l3_router import l3_tn as router_plugin
+from networking_tn.db import tn_db
+from networking_tn.tnosclient import tnos_router
+from networking_tn.services.firewall import tn_fwaas_plugin as fw_plugin
+from networking_tn.tnosclient import tnos_firewall
 
 LOG.debug('trace')
 
@@ -113,7 +113,7 @@ class Fake_context(object):
         self.request_id = 'migration_context'
 
 
-class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
+class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
     def __init__(self):
         self._tn_info = None
         self.tn_init()
@@ -129,9 +129,9 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         router_name = router['name']
 
         try:
-            tn_router = tnos.TnosRouter(context, router_id, None, router_name, self._tn_info["image_path"],
+            tn_router = tnos_router.TnosRouter(context, router_id, None, router_name, self._tn_info["image_path"],
                                         self._tn_info['address'])
-            tn_client = tnos.get_tn_client(router_id)
+            tn_client = tnos_router.get_tn_client(router_id)
             tn_router.get_intf_info(tn_client)
             tn_router.store_router()
 
@@ -173,14 +173,14 @@ class Fake_TNL3ServicePlugin(l3_tn.TNL3ServicePlugin):
         return returned_obj
 
 
-class Fake_TNFirewallPlugin(fw.TNFirewallPlugin):
+class Fake_TNFirewallPlugin(fw_plugin.TNFirewallPlugin):
 
     def create_firewall(self, context, fw_with_rules):
         LOG.debug("create_firewall() called")
 
         LOG.debug(fw_with_rules)
 
-        tn_fw = tnos_fw.TNFirewall(fw_with_rules['id'], fw_with_rules['name'], fw_with_rules['description'])
+        tn_fw = tnos_firewall.TNFirewall(fw_with_rules['id'], fw_with_rules['name'], fw_with_rules['description'])
         tn_policy = tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
         rules = fw_with_rules['firewall_rule_list']
 
@@ -383,18 +383,52 @@ def floatingip_migration(context, l3_driver):
             p.update()
 
 
-def main():
+def test_db(context):
+    # tn_db.add_record(context, tn_db.Tn_Router, id='1234567890', priv_id='123', tenant_id='123',
+    #                 name='test', manage_ip='1.1.1.1')
+    router = tn_db.query_record(context, tn_db.Tn_Router, id='1234567890')
+    # LOG.debug('router name %s', router.name)
 
+    # tn_db.add_record(context, tn_db.Tn_Interface, name='12345', tenant_id='00001')
+    interface = tn_db.query_record(context, tn_db.Tn_Interface, id='12345')
+    LOG.debug('interface %s', interface)
+
+    route = tn_db.query_record(context, tn_db.Tn_Static_Route, router_id='12345')
+    LOG.debug('route %s', route)
+
+    address = tn_db.query_record(context, tn_db.Tn_Address, rule_id='12345')
+    LOG.debug('address %s', address)
+
+    service = tn_db.query_record(context, tn_db.Tn_Service, rule_id='12345')
+    LOG.debug('service %s', service)
+
+    rule = tn_db.query_record(context, tn_db.Tn_Rule, id='12345')
+    LOG.debug('rule %s', rule)
+
+    policy = tn_db.query_record(context, tn_db.Tn_Policy, id='12345')
+    LOG.debug('policy %s', policy)
+
+    firewall = tn_db.query_record(context, tn_db.Tn_Firewall, id='12345')
+    LOG.debug('firewall %s', firewall)
+
+
+def main():
+    '''
+    try:
         context = Fake_context()
-        #l3_driver = Fake_TNL3ServicePlugin()
-        #router_migration(context, l3_driver)
-        #port_migration(context, l3_driver)
+        l3_driver = Fake_TNL3ServicePlugin()
+        router_migration(context, l3_driver)
+        port_migration(context, l3_driver)
 
         fw_plugin = Fake_TNFirewallPlugin()
         firewall_migration(context, fw_plugin)
 
-    #except Exception as e:
-    #    raise(e)
+    except Exception as e:
+        raise(e)
+    '''
+    context = Fake_context()
+    #test_db(context)
+    tnos_router.router_test(context)
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ from sqlalchemy import event
 from neutron_lib.db import model_base
 
 MYSQL_ENGINE = None
-FGT_VERSION_TABLE = 'alembic_version_fortinet'
+TN_VERSION_TABLE = 'alembic_version_tn'
 config = context.config
 neutron_config = config.neutron_config
 logging_config.fileConfig(config.config_file_name)
@@ -49,7 +49,7 @@ def run_migrations_offline():
         kwargs['url'] = neutron_config.database.connection
     else:
         kwargs['dialect_name'] = neutron_config.database.engine
-    kwargs['version_table'] = FGT_VERSION_TABLE
+    kwargs['version_table'] = TN_VERSION_TABLE
     context.configure(**kwargs)
 
     with context.begin_transaction():
@@ -70,7 +70,7 @@ def run_migrations_online():
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        version_table=FGT_VERSION_TABLE
+        version_table=TN_VERSION_TABLE
     )
     try:
         with context.begin_transaction():

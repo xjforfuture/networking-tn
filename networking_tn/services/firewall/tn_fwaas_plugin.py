@@ -31,7 +31,7 @@ from neutron_fwaas.common import fwaas_constants as f_const
 from neutron_fwaas.db.firewall import firewall_db
 from neutron_fwaas.db.firewall import firewall_router_insertion_db
 
-from networking_tn.tnosclient import tnos_firewall as tnos_fw
+from networking_tn.tnosclient import tnos_firewall as tnos
 
 LOG = logging.getLogger(__name__)
 
@@ -301,26 +301,25 @@ class TNFirewallPlugin(
 
         LOG.debug(fw_with_rules)
 
-        tn_fw = tnos_fw.TNFirewall(fw_with_rules['id'], fw_with_rules['name'], fw_with_rules['description'])
-        tn_policy = tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
+        tn_fw = tnos.TNFirewall.create(fw_with_rules['id'], fw_with_rules['name'], fw_with_rules['description'])
+        tn_policy = tnos.TNFirewall.add_policy(context, tn_fw, fw_with_rules['firewall_policy_id'])
         rules = fw_with_rules['firewall_rule_list']
 
-        if tn_policy.rules == []:
+        if len(tn_policy.rule_inner_use) == 0:
             LOG.debug('trace')
             for rule in rules:
                 LOG.debug('trace')
-                tn_policy.add_rule(rule)
+                tnos.TNPolicy.add_rule(context, tn_policy, rule)
 
         try:
             for router_id in fw_with_rules['add-router-ids']:
                 LOG.debug('router %s', router_id)
-                tn_fw.apply_to_router(router_id)
-        except:
+                tnos.TNFirewall.apply_to_router(context, tn_fw, router_id)
+        except Exception:
             self.delete_firewall(context, fw['id'])
             raise
         else:
             self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
-            tn_fw.store()
 
         return fw
 
@@ -385,9 +384,9 @@ class TNFirewallPlugin(
                  'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'}]}
         '''
 
-        tn_fw = tnos_fw.get_tn_fw(id)
-        tn_fw.name = fw_with_rules['name']
-        tn_fw.desc = fw_with_rules['description']
+        tn_fw = tnos.TNFirewall.get(id=id)
+        #tn_fw.name = fw_with_rules['name']
+        #tn_fw.desc = fw_with_rules['description']
 
         LOG.debug("%s  %s  ", tn_fw.policy_id, fw_with_rules['firewall_policy_id'])
         if tn_fw.policy_id != fw_with_rules['firewall_policy_id']:
@@ -395,48 +394,43 @@ class TNFirewallPlugin(
             try:
                 for router_id in fw_with_rules['router_ids']:
                     LOG.debug('router %s', router_id)
-                    tn_fw.unapply_to_router(router_id)
+                    tnos.TNFirewall.unapply_to_router(router_id)
 
-                old_policy = tnos_fw.get_tn_policy(tn_fw.policy_id)
-                old_policy.firewall_id.remove(id)
-                if old_policy.firewall_id == []:
-                    old_policy.delete()
+                tnos.TNFirewall.del_policy(context, tn_fw)
 
-                new_policy = tnos_fw.get_tn_policy(fw_with_rules['project_id'])
+                new_policy = tnos.TNPolicy.get(id=fw_with_rules['project_id'])
                 if new_policy == None:
-                    tn_policy = tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
+                    new_policy = tnos.TNFirewall.add_policy(context, tn_fw, fw_with_rules['firewall_policy_id'])
                     rules = fw_with_rules['firewall_rule_list']
                     for rule in rules:
-                        tn_policy.add_rule(rule)
+                        tnos.TNPolicy.add_rule(context, new_policy, rule)
                 else:
-                    tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
+                    tnos.TNFirewall.add_policy(context, tn_fw, fw_with_rules['firewall_policy_id'])
 
                 for router_id in fw_with_rules['router_ids']:
                     LOG.debug('router %s', router_id)
-                    tn_fw.apply_to_router(router_id)
+                    tnos.TNFirewall.apply_to_router(context, tn_fw, router_id)
 
-            except:
+            except Exception:
                 self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ERROR)
                 raise
             else:
                 self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
-                tn_fw.store()
 
         else:
             try:
                 for router_id in fw_with_rules['add-router-ids']:
                     LOG.debug('router %s', router_id)
-                    tn_fw.apply_to_router(router_id)
+                    tnos.TNFirewall.apply_to_router(context, tn_fw, router_id)
 
                 for router_id in fw_with_rules['del-router-ids']:
                     LOG.debug('router %s', router_id)
-                    tn_fw.unapply_to_router(router_id)
-            except:
+                    tnos.TNFirewall.unapply_to_router(context, tn_fw, router_id)
+            except Exception:
                 self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ERROR)
                 raise
             else:
                 self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
-                tn_fw.store()
 
         return fw
 
@@ -460,17 +454,17 @@ class TNFirewallPlugin(
             # Reflect state change in fw_with_rules
             fw_with_rules['status'] = status['firewall']['status']
 
-            tn_fw = tnos_fw.get_tn_fw(id)
+            tn_fw = tnos.TNFirewall.get(id=id)
             try:
                 for router_id in fw_with_rules['del-router-ids']:
                     LOG.debug('router %s', router_id)
-                    tn_fw.unapply_to_router(router_id)
+                    tnos.TNFirewall.unapply_to_router(context, tn_fw, router_id)
             except:
                 self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ERROR)
                 raise
             else:
                 self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)
-                tn_fw.delete()
+                tnos.TNFirewall.delete()
                 self.delete_db_firewall_object(context, id)
 
     '''
@@ -493,11 +487,11 @@ class TNFirewallPlugin(
             firewall_policy = self.get_firewall_policy(context, firewall_policy_id)
             if firewall_policy and 'firewall_list' in firewall_policy:
                 for firewall_id in firewall_policy['firewall_list']:
-                    tn_fw = tnos_fw.get_tn_fw(firewall_id)
+                    tn_fw = tnos.TNFirewall.get(context, id=firewall_id)
                     if tn_fw != None:
                         self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
                         try:
-                            tn_fw.update_rule_apply(fwr)
+                            tnos.TNFirewall.update_rule_and_apply(context, tn_fw, fwr)
                         except:
                             self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
                         else:
@@ -536,22 +530,22 @@ class TNFirewallPlugin(
         firewall_policy = self.get_firewall_policy(context, id)
         if firewall_policy and 'firewall_list' in firewall_policy:
             for firewall_id in firewall_policy['firewall_list']:
-                tn_fw = tnos_fw.get_tn_fw(firewall_id)
+                tn_fw = tnos.TNFirewall.get(id=firewall_id)
 
                 if tn_fw != None:
                     self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
                     try:
-                        tn_fw.add_rule_apply(new_rule)
+                        tnos.TNFirewall.add_rule_and_apply(context, tn_fw, new_rule)
 
                         if len(rule_info['insert_before']) != 0:
-                            tn_fw.move_rule_apply(rule_info['firewall_rule_id'],
+                            tn_fw.move_rule_apply(context, tn_fw, rule_info['firewall_rule_id'],
                                                     rule_info['insert_before'],
-                                                    tnos_fw.TNOS_INSERT_RULE_ACTION['insert_before'])
+                                                    tnos.TNOS_INSERT_RULE_ACTION['insert_before'])
 
                         if len(rule_info['insert_after']) != 0:
-                            tn_fw.move_rule_apply(rule_info['firewall_rule_id'],
+                            tn_fw.move_rule_apply(context, tn_fw, rule_info['firewall_rule_id'],
                                                     rule_info['insert_after'],
-                                                    tnos_fw.TNOS_INSERT_RULE_ACTION['insert_after'])
+                                                    tnos.TNOS_INSERT_RULE_ACTION['insert_after'])
                     except:
                         self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
                     else:
@@ -575,11 +569,11 @@ class TNFirewallPlugin(
         firewall_policy = self.get_firewall_policy(context, id)
         if firewall_policy and 'firewall_list' in firewall_policy:
             for firewall_id in firewall_policy['firewall_list']:
-                tn_fw = tnos_fw.get_tn_fw(firewall_id)
+                tn_fw = tnos.TNFirewall.get(id=firewall_id)
                 if tn_fw != None:
                     self.update_firewall_status(context, firewall_id, nl_constants.PENDING_UPDATE)
                     try:
-                        tn_fw.remove_rule_apply(rule_id)
+                        tnos.TNFirewall.remove_rule_and_apply(context, tn_fw, rule_id)
                     except:
                         self.update_firewall_status(context, firewall_id, nl_constants.ERROR)
                     else:
