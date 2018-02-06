@@ -23,8 +23,6 @@ TNOS_ACTION = {'allow':'permit',
 
 TNOS_INSERT_RULE_ACTION = {'insert_after':'after', 'insert_before':'before'}
 
-NO_NEED_COMMIT = ['Any', 'TCP-ANY', 'UDP-ANY', 'ICMP']
-
 TN_POLICIES = {}
 
 class TNL3Address(object):
@@ -40,14 +38,14 @@ class TNL3Address(object):
     def add_apply(context, client, rule_id, name):
         addr = tn_db.query_record(context, tn_db.Tn_Address, rule_id=rule_id, name=name)
 
-        if addr.name not in NO_NEED_COMMIT:
+        if addr is not None:
             client.request(templates.ADD_ADDRESS_ENTRY, name=addr.name, ip_prefix=addr.ip_prefix)
 
     @staticmethod
     def del_apply(context, client, rule_id, name):
         addr = tn_db.query_record(context, tn_db.Tn_Address, rule_id=rule_id, name=name)
 
-        if addr.name not in NO_NEED_COMMIT:
+        if addr is not None:
             client.request(templates.DEL_ADDRESS_ENTRY, name=addr.name)
 
 class TNService(object):
@@ -87,7 +85,7 @@ class TNService(object):
     def add_apply(context, client, rule_id):
         svc = tn_db.query_record(context, tn_db.Tn_Service, rule_id=rule_id)
 
-        if svc.name not in NO_NEED_COMMIT:
+        if svc is not None:
             client.request(templates.ADD_SERVICE_ENTRY, name=svc.name, protocol=svc.protocol,
                            dst_port_max=svc.dst_port_max, dst_port_min=svc.dst_port_min,
                            src_port_max=svc.src_port_max, src_port_min=svc.src_port_min)
@@ -96,7 +94,7 @@ class TNService(object):
     def del_apply(context, client, rule_id):
         svc = tn_db.query_record(context, tn_db.Tn_Service, rule_id=rule_id)
 
-        if svc.name not in NO_NEED_COMMIT:
+        if svc is not None:
             client.request(templates.DEL_SERVICE_ENTRY, name=svc.name, protocol=svc.protocol,
                            dst_port_max=svc.dst_port_max, dst_port_min=svc.dst_port_min,
                            src_port_max=svc.src_port_max, src_port_min=svc.src_port_min)
@@ -138,8 +136,12 @@ class TNRule(object):
         tn_db.delete_record(context, tn_db.Tn_Rule, id=rule.id)
 
     @staticmethod
-    def get(context, **kwargs):
+    def gets(context, **kwargs):
         return tn_db.query_records(context, tn_db.Tn_Rule, **kwargs)
+
+    @staticmethod
+    def get(context, **kwargs):
+        return tn_db.query_record(context, tn_db.Tn_Rule, **kwargs)
 
     @staticmethod
     def init_address(context, rule_id, rule_name, addr_postfix, addr):
@@ -199,7 +201,7 @@ class TNPolicy(object):
 
     @staticmethod
     def delete(context, policy):
-        rules = TNRule.get(context, policy_id=policy.id)
+        rules = TNRule.gets(context, policy_id=policy.id)
         for rule in rules:
             TNPolicy.del_rule(context, policy, rule)
 
@@ -211,10 +213,11 @@ class TNPolicy(object):
 
     @staticmethod
     def get(context, **kwargs):
-        return tn_db.query_records(context, tn_db.Tn_Policy, **kwargs)
+        return tn_db.query_record(context, tn_db.Tn_Policy, **kwargs)
 
     @staticmethod
     def add_rule(context, policy, rule_dict):
+
         used = policy.rule_inner_use.split(',')
 
         for i in range(TNOS_RULE_ID_MIN, TNOS_RULE_ID_MAX+1):
@@ -271,7 +274,7 @@ class TNFirewall(object):
     @staticmethod
     def delete(context, fw):
         TNFirewall.del_policy(context, fw)
-        tn_db.delete_record(context, tn_db.Tn_Firewall, id=id)
+        tn_db.delete_record(context, tn_db.Tn_Firewall, id=fw.id)
 
     @staticmethod
     def update(context, obj, **kwargs):
@@ -279,23 +282,23 @@ class TNFirewall(object):
 
     @staticmethod
     def get(context, **kwargs):
-        return tn_db.query_records(context, tn_db.Tn_Firewall, **kwargs)
+        return tn_db.query_record(context, tn_db.Tn_Firewall, **kwargs)
 
     @staticmethod
     def add_policy(context, fw, policy_id, name=None, desc=None):
         policy = TNPolicy.get(context, id=policy_id)
-        if policy == None:
+        if policy is None:
             policy = TNPolicy.create(context, policy_id, name, desc)
         else:
             TNPolicy.update(context, policy, reference_count=policy.reference_count+1)
 
-        TNFirewall.update(context, fw, policy_id=fw.policy_id)
+        TNFirewall.update(context, fw, policy_id=policy_id)
         return policy
 
     @staticmethod
     def del_policy(context, fw):
         policy = TNPolicy.get(context, id=fw.policy_id)
-        if policy != None:
+        if policy is not None:
             count = policy.reference_count - 1
             if count == 0:
                 TNPolicy.delete(context, policy)
@@ -306,14 +309,18 @@ class TNFirewall(object):
 
     @staticmethod
     def apply_to_router(context, fw, router_id):
-        router_ids = fw.router_ids.split(',')
+        if fw.router_ids is not None:
+            router_ids = fw.router_ids.split(',')
+        else:
+            router_ids = []
+
         if router_id not in router_ids:
             router_ids.append(router_id)
             router_ids = ','.join(router_ids)
             TNFirewall.update(context, fw, router_ids=router_ids)
-            client = tnos.get_tn_client(router_id)
+            client = tnos.get_tn_client(context, router_id)
             if client != None:
-                rules = TNRule.get(context, policy_id=fw.policy_id)
+                rules = TNRule.gets(context, policy_id=fw.policy_id)
                 for rule in rules:
                     TNRule.add_apply(context, client, rule)
             else:
@@ -328,9 +335,9 @@ class TNFirewall(object):
             router_ids.remove(router_id)
             router_ids = ','.join(router_ids)
             TNFirewall.update(context, fw, router_ids=router_ids)
-            client = tnos.get_tn_client(router_id)
+            client = tnos.get_tn_client(context, router_id)
             if client != None:
-                rules = TNRule.get(context, policy_id=fw.policy_id)
+                rules = TNRule.gets(context, policy_id=fw.policy_id)
                 for rule in rules:
                     TNRule.del_apply(context, client, rule)
             else:
@@ -340,9 +347,9 @@ class TNFirewall(object):
     def add_rule_and_apply(context, fw, rule_dict):
         router_ids = fw.router_ids.split(',')
         for router_id in router_ids:
-            client = tnos.get_tn_client(router_id)
+            client = tnos.get_tn_client(context, router_id)
             if client != None:
-                policy = TNPolicy.get(id=fw.policy_id)
+                policy = TNPolicy.get(context, id=fw.policy_id)
                 TNPolicy.add_rule_and_apply(context, client, policy, rule_dict)
             else:
                 LOG.debug('error')
@@ -356,9 +363,9 @@ class TNFirewall(object):
     def move_rule_apply(context, fw, src_rule_id, dst_rule_id, action):
         router_ids = fw.router_ids.split(',')
         for router_id in router_ids:
-            client = tnos.get_tn_client(router_id)
+            client = tnos.get_tn_client(context, router_id)
             if client != None:
-                policy = TNPolicy.get(id=fw.policy_id)
+                policy = TNPolicy.get(context, id=fw.policy_id)
                 TNPolicy.insert_rule_apply(context, client, policy, src_rule_id, dst_rule_id, action)
             else:
                 LOG.debug('error')
@@ -367,58 +374,70 @@ class TNFirewall(object):
     def remove_rule_and_apply(context, fw, rule_id):
         router_ids = fw.router_ids.split(',')
         for router_id  in router_ids:
-            client = tnos.get_tn_client(router_id)
+            client = tnos.get_tn_client(context, router_id)
             if client != None:
-                policy = TNPolicy.get(id=fw.policy_id)
+                policy = TNPolicy.get(context, id=fw.policy_id)
                 TNPolicy.remove_rule_and_apply(context, client, policy, rule_id)
             else:
                 LOG.debug('error')
 
 def main_test(context):
 
-    tn_fw = TNFirewall.create(context, '0a70bcd8-66cb-4235-b8b4-7dda9a3256bf', 'test1', 'test1-desc')
-    tn_policy = TNPolicy.create(context, '1234', 'test1', 'test1-desc')
+    router_id = '48026c38-9fb8-4fd6-ac56-237d17fd8b9f'
+
+    '''
+    tn_fw = TNFirewall.create(context, '111111111', 'test1', 'test1-desc')
+    tn_policy = TNFirewall.add_policy(context, tn_fw, '111111', 'test1-desc')
 
     rule_info = {
         'protocol': u'tcp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
-        'destination_ip_address': None, 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
+        'destination_ip_address': None, 'firewall_policy_id': u'111111',
         'position': 1, 'destination_port': None, 'id': u'5683780b-77d3-4d1b-acb7-4360b7f48347',
         'name': u'test-rule-1', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
         'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'
     }
-    TNRule.add_rule(rule_info)
+    TNPolicy.add_rule(context, tn_policy, rule_info)
 
     rule_info = {
         'protocol': u'tcp', 'description': u'123', 'source_port': None, 'source_ip_address': None,
-        'destination_ip_address': u'20.1.1.1/24', 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
+        'destination_ip_address': u'20.1.1.1/24', 'firewall_policy_id': u'111111',
         'position': 1, 'destination_port': None, 'id': u'5683780b-77d3-4d1b-acb7-4360b7f48348',
         'name': u'test-rule-2', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
         'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'
     }
-    TNRule.add_rule(rule_info)
+    TNPolicy.add_rule(context, tn_policy, rule_info)
 
-    tn_fw.store()
+    TNFirewall.apply_to_router(context, tn_fw, router_id)
+    '''
 
-    tn_firewall = get_tn_fw('0a70bcd8-66cb-4235-b8b4-7dda9a3256bf')
-    tn_firewall.apply_to_router('1234567890')
 
+    tn_fw = TNFirewall.get(context, id='111111111')
+
+    '''
     rule_info = {
         'protocol': u'icmp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
-        'destination_ip_address': None, 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
+        'destination_ip_address': None, 'firewall_policy_id': u'111111',
         'position': 1, 'destination_port': None, 'id': u'5683780b-77d3-4d1b-acb7-4360b7f48349',
         'name': u'test-rule-3', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
         'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'
     }
-    tn_firewall.add_rule_apply(rule_info)
 
-    #tn_firewall.move_rule_apply('5683780b-77d3-4d1b-acb7-4360b7f48349',
-    #                              '5683780b-77d3-4d1b-acb7-4360b7f48347',
-    #                              TNOS_INSERT_RULE_ACTION['insert_before'])
+    TNFirewall.add_rule_and_apply(context, tn_fw, rule_info)
+    '''
 
-    tn_firewall.remove_rule_apply(rule_info['id'])
+    #TNFirewall.remove_rule_and_apply(context, tn_fw, '5683780b-77d3-4d1b-acb7-4360b7f48349')
+    TNFirewall.move_rule_apply(context, tn_fw, '5683780b-77d3-4d1b-acb7-4360b7f48349',
+                               '5683780b-77d3-4d1b-acb7-4360b7f48347', TNOS_INSERT_RULE_ACTION['insert_before'])
 
-    #tn_firewall.unapply_to_router('1234567890')
+    '''
+    TNFirewall.unapply_to_router(context, tn_fw, router_id)
+    TNFirewall.delete(context, tn_fw)
+    '''
 
-if __name__ == '__main__':
-    main()
+
+
+
+
+
+
 

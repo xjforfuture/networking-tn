@@ -55,11 +55,15 @@ def get_tn_client(context, router_id):
     if router_id in TNOS_CLIENT:
         return TNOS_CLIENT[router_id]
 
+    if router_id == '999999':
+        TNOS_CLIENT[router_id] = config.get_apiclient('88.1.1.1')
+        return TNOS_CLIENT[router_id]
+
     tn_router = tn_db.query_record(context, tn_db.Tn_Router, id=router_id)
+    if tn_router is not None:
+        TNOS_CLIENT[router_id] = config.get_apiclient(tn_router.manage_ip)
 
-    TNOS_CLIENT[router_id] = config.get_apiclient(tn_router.manage_ip)
-
-    return TNOS_CLIENT[router_id]
+        return TNOS_CLIENT[router_id]
 
 
 def create_tnos(id, priv_id, image_path, manage_ip):

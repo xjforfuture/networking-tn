@@ -428,7 +428,8 @@ def main():
     '''
     context = Fake_context()
     #test_db(context)
-    tnos_router.router_test(context)
+    #tnos_router.router_test(context)
+    tnos_firewall.main_test(context)
 
 
 if __name__ == "__main__":
