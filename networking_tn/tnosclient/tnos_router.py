@@ -127,8 +127,9 @@ def del_router(context, router_id):
 
     # kill vm and delete router
     router = tn_db.query_record(context, tn_db.Tn_Router, id=router_id)
-    tn_drv.destroy_vm(router_id, router.image_name)
-    tn_db.delete_record(context, tn_db.Tn_Router, id=router_id)
+    if router is not None:
+        tn_drv.destroy_vm(router_id, router.image_name)
+        tn_db.delete_record(context, tn_db.Tn_Router, id=router_id)
 
 
 def init_intf(router_priv_id, manage_ip):

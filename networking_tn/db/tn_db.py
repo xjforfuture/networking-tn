@@ -266,7 +266,7 @@ class Tn_Policy(model_base.BASEV2, DBbase):
     id = sa.Column(sa.String(64), primary_key=True)
     name = sa.Column(sa.String(32))
     desc = sa.Column(sa.String(32))
-    rule_inner_use = sa.Column(sa.String(1024), default='')
+    rule_inner_use = sa.Column(sa.String(1024))
     reference_count = sa.Column(sa.Integer)
 
 class Tn_Firewall(model_base.BASEV2, DBbase):

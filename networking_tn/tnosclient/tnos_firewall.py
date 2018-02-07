@@ -217,14 +217,17 @@ class TNPolicy(object):
 
     @staticmethod
     def add_rule(context, policy, rule_dict):
-
-        used = policy.rule_inner_use.split(',')
+        if policy.rule_inner_use is None:
+            used = []
+        else:
+            used = policy.rule_inner_use.split(',')
 
         for i in range(TNOS_RULE_ID_MIN, TNOS_RULE_ID_MAX+1):
             if str(i) not in used:
                 rule = TNRule.create(context, i, rule_dict)
                 used.append(str(i))
                 used = ','.join(used)
+
                 TNPolicy.update(context, policy, rule_inner_use=used)
 
                 return rule
@@ -316,7 +319,10 @@ class TNFirewall(object):
 
         if router_id not in router_ids:
             router_ids.append(router_id)
+            LOG.debug('router ids %s', router_ids)
             router_ids = ','.join(router_ids)
+
+            LOG.debug('router ids %s', router_ids)
             TNFirewall.update(context, fw, router_ids=router_ids)
             client = tnos.get_tn_client(context, router_id)
             if client != None:
@@ -433,11 +439,3 @@ def main_test(context):
     TNFirewall.unapply_to_router(context, tn_fw, router_id)
     TNFirewall.delete(context, tn_fw)
     '''
-
-
-
-
-
-
-
-
