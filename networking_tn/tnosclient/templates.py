@@ -285,7 +285,7 @@ DEL_SERVICE_ENTRY = """
 """
 
 
-ADD_ADDRESS_SNAT = """
+ADD_SNAT_RULE = """
 {
     "path": "/api/policy_nat_source_nat/?vdom=root",
     "method": "POST",
@@ -349,8 +349,91 @@ ADD_ADDRESS_SNAT = """
         {% if trans_mode is defined %}
             "trans_mode":"{{ trans_mode }}"
         {% else %}
-            "trans_mode":"static"
+            "trans_mode":"dynamicport"
         {% endif %}
+    }
+}
+"""
+
+DEL_SNAT_RULE = """
+{
+    "path": "/api/policy_nat_source_nat/?vdom=root",
+    "method": "DELETE",
+    "body": {
+        "id": "{{ id }}",
+
+        {% if desc is defined %}
+            "description": "{{ desc }}",
+        {% endif %}
+
+        "saddr":"{{ saddr }}",
+
+        {% if daddr is defined %}
+            "daddr": "{{ daddr }}",
+        {% else %}
+            "daddr":"Any",
+        {% endif %}
+
+        {% if eif is defined %}
+            "eif": "{{ eif }}",
+        {% endif %}
+
+        {% if log_flag is defined %}
+            "log":"{{ log_flag }}",
+        {% else %}
+            "log":"disable",
+        {% endif %}
+
+        {% if reverse_flag is defined %}
+            "reverse":"{{ reverse_flag }}",
+        {% else %}
+            "reverse":"disable",
+        {% endif %}
+
+        {% if service is defined %}
+            "service":"{{ service }}",
+        {% else %}
+            "service":"Any",
+        {% endif %}
+
+        {% if status is defined %}
+            "status":"{{ status }}",
+        {% else %}
+            "status":"enable",
+        {% endif %}
+
+        {% if sticky_flag is defined %}
+            "sticky":"{{ sticky_flag }}",
+        {% else %}
+            "sticky":"disable",
+        {% endif %}
+
+        {% if trans is defined %}
+            "trans":"{{ trans }}",
+        {% else %}
+            "trans":"trans-to",
+        {% endif %}
+
+        "trans_addr":"{{ trans_addr }}",
+
+        {% if trans_mode is defined %}
+            "trans_mode":"{{ trans_mode }}"
+        {% else %}
+            "trans_mode":"dynamicport"
+        {% endif %}
+    }
+}
+"""
+
+MOVE_SNAT_RULE = """
+{
+    "path": "/api/policy_nat_source_nat/move/move?vdom=root&srcKey={{ srcKey }}&move_act={{ action }}&dstKey={{ dstKey }}",
+    "method": "PUT",
+    "body": {
+        "dst":"{{ dstKey }}",
+        "src":"{{ srcKey }}",
+        "move_act":"{{ action }}",
+        "_id":"move"
     }
 }
 """

@@ -51,6 +51,7 @@ def upgrade():
                     sa.Column('name', mysql.VARCHAR(length=64), nullable=True),
                     sa.Column('manage_ip', mysql.VARCHAR(length=32), nullable=False),
                     sa.Column('image_name', mysql.VARCHAR(length=128), nullable=False),
+                    sa.Column('snat_inner_use', mysql.VARCHAR(length=1024), nullable=True),
                     sa.PrimaryKeyConstraint('id')
                     )
 
@@ -83,7 +84,7 @@ def upgrade():
                     sa.Column('rule_id', mysql.VARCHAR(length=64), nullable=False),
                     sa.Column('name', mysql.VARCHAR(length=64), nullable=False),
                     sa.Column('ip_prefix', mysql.VARCHAR(length=32), nullable=False),
-                    sa.PrimaryKeyConstraint('rule_id')
+                    sa.PrimaryKeyConstraint('rule_id', 'name')
                     )
 
     op.create_table('tn_services',
@@ -95,6 +96,19 @@ def upgrade():
                     sa.Column('dst_port_min', mysql.INTEGER(display_width=32), autoincrement=False, nullable=False),
                     sa.Column('dst_port_max', mysql.INTEGER(display_width=32), autoincrement=False, nullable=False),
                     sa.PrimaryKeyConstraint('rule_id')
+                    )
+
+    op.create_table('tn_snat_rules',
+                    sa.Column('router_id', mysql.VARCHAR(length=64), nullable=False),
+                    sa.Column('inner_id', mysql.INTEGER(display_width=32), autoincrement=False, nullable=False),
+                    sa.Column('srcaddr', mysql.VARCHAR(length=32), nullable=True),
+                    sa.Column('dstaddr', mysql.VARCHAR(length=32), nullable=True),
+                    sa.Column('trans_addr', mysql.VARCHAR(length=32), nullable=True),
+                    sa.Column('srcaddr_name', mysql.VARCHAR(length=32), nullable=True),
+                    sa.Column('dstaddr_name', mysql.VARCHAR(length=32), nullable=True),
+                    sa.Column('trans_addr_name', mysql.VARCHAR(length=32), nullable=True),
+                    sa.Column('trans', mysql.VARCHAR(length=16), nullable=True),
+                    sa.PrimaryKeyConstraint('router_id', 'inner_id')
                     )
 
     op.create_table('tn_rules',

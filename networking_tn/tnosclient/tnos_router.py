@@ -3,6 +3,7 @@ import time
 import subprocess
 import sys
 from oslo_log import log as logging
+from neutron.db.models import segment as segments_db
 
 from networking_tn.tnosclient import tnos_driver as tn_drv
 from networking_tn.tnosclient import ovs_cb as ovsctl
@@ -27,6 +28,7 @@ GW_INTF = 2
 
 MIN_SUB_INTF_ID = 1
 MAX_SUB_INTF_ID = 4094
+
 
 EXTERN_INTF_NAME = 'tap%(num)s-%(router_priv_id)s'
 INNER_INTF_NAME = 'ethernet%(num)s'
@@ -152,6 +154,9 @@ def add_intf(context, router_id, port, is_gw):
 
     LOG.debug(port)
 
+    tag = get_vlan_id(context, port['network_id'])
+    port_name = 'qr-'+port['id'][:12]
+    '''
     port_name = None
     tag = []
     for i in range(10):
@@ -160,8 +165,8 @@ def add_intf(context, router_id, port, is_gw):
             time.sleep(3)
         else:
             break
-
-    if port_name is None or tag == [] or tag is None:
+    '''
+    if tag is None:
         return None
 
     cmd = 'sudo ip netns exec qrouter-'+router_id+' ifconfig '+port_name+' down'
@@ -242,6 +247,13 @@ def get_intf_info(context, router_id):
             if info['mkey'] == intf.inner_name:
                 tn_db.update_record(context, intf, inner_id=info['mkey_id'], type=info['type'])
 
+def get_vlan_id(context, network_id):
+    ml2_net_seg = tn_db.query_record(context,
+                                           segments_db.NetworkSegment,
+                                           network_id=network_id)
+    LOG.debug(ml2_net_seg)
+    return getattr(ml2_net_seg, 'segmentation_id', None)
+
 
 def cfg_intf_ip(context, router_id, intf, ip_prefix):
     api_client = get_tn_client(context, router_id)
@@ -277,11 +289,6 @@ def del_static_route(context, router_id, dest, prefix, next_hop):
 
 def get_static_route(context, **kwargs):
     return tn_db.query_records(context, tn_db.Tn_Static_Route, **kwargs)
-
-
-def add_address_snat(context, router_id, id, saddr, trans_addr):
-    api_client = get_tn_client(context, router_id)
-    api_client.request(templates.ADD_ADDRESS_SNAT, id=id, saddr=saddr, trans_addr=trans_addr)
 
 
 def router_test(context):

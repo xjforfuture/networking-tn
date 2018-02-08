@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet, Inc.
+# Copyright 2018 Tsinghuanet, Inc.
 # All rights reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -14,7 +14,7 @@
 #    under the License.
 
 
-"""Fortinet specific database schema/model."""
+"""Tsinghuanet specific database schema/model."""
 
 import copy
 from neutron_lib.db import model_base
@@ -206,6 +206,7 @@ class Tn_Router(model_base.BASEV2, DBbase):
     name = sa.Column(sa.String(64))
     manage_ip = sa.Column(sa.String(32))
     image_name = sa.Column(sa.String(128))
+    snat_inner_use = sa.Column(sa.String(128))
 
 class Tn_Interface(model_base.BASEV2, DBbase):
     """Schema for tn network."""
@@ -219,9 +220,9 @@ class Tn_Interface(model_base.BASEV2, DBbase):
     mac = sa.Column(sa.String(32))
     vlan_id = sa.Column(sa.Integer)
     ip_prefix = sa.Column(sa.String(32))
-    is_manage = sa.Column(sa.String(16), default='false')
-    is_gw = sa.Column(sa.String(16), default='false')
-    is_sub = sa.Column(sa.String(16), default='false')
+    is_manage = sa.Column(sa.String(16), default='False')
+    is_gw = sa.Column(sa.String(16), default='False')
+    is_sub = sa.Column(sa.String(16), default='False')
 
 class Tn_Static_Route(model_base.BASEV2, DBbase):
     """Schema for tn network."""
@@ -246,6 +247,18 @@ class Tn_Service(model_base.BASEV2, DBbase):
     dst_port_min = sa.Column(sa.Integer)
     dst_port_max = sa.Column(sa.Integer)
 
+
+class Tn_Snat_rule(model_base.BASEV2, DBbase):
+    """Schema for tn network."""
+    router_id = sa.Column(sa.String(64), primary_key=True)
+    inner_id = sa.Column(sa.Integer, primary_key=True)
+    srcaddr = sa.Column(sa.String(32))
+    dstaddr = sa.Column(sa.String(32))
+    trans_addr = sa.Column(sa.String(32))
+    srcaddr_name = sa.Column(sa.String(32))
+    dstaddr_name = sa.Column(sa.String(32))
+    trans_addr_name = sa.Column(sa.String(32))
+    trans =sa.Column(sa.String(16))
 
 class Tn_Rule(model_base.BASEV2, DBbase):
     """Schema for tn network."""

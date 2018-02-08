@@ -1,4 +1,4 @@
-# Copyright 2017 tsinghuanet Inc.
+# Copyright 2018 tsinghuanet Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -30,6 +30,9 @@ from neutron.objects.network import ExternalNetwork
 from oslo_db.sqlalchemy import session
 import neutron.plugins.ml2.models as ml2_db
 from neutron_fwaas.db.firewall import firewall_db
+
+from neutron_lib import constants as cst
+
 
 sys.path.append(r'/home/xiongjun/work/networking-tn/')
 
@@ -411,6 +414,14 @@ def test_db(context):
     firewall = tn_db.query_record(context, tn_db.Tn_Firewall, id='12345')
     LOG.debug('firewall %s', firewall)
 
+def test(context):
+
+    ports = tn_db.query_records(context, models_v2.Port)
+    for port in ports:
+        LOG.debug(port)
+
+        vlan_id = tnos_router.get_vlan_id(context, port['network_id'])
+        LOG.debug(str(vlan_id))
 
 def main():
     '''
@@ -426,11 +437,12 @@ def main():
     except Exception as e:
         raise(e)
     '''
+
     context = Fake_context()
     #test_db(context)
     #tnos_router.router_test(context)
-    tnos_firewall.main_test(context)
-
+    #tnos_firewall.main_test(context)
+    test(context)
 
 if __name__ == "__main__":
     main()

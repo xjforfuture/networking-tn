@@ -17,6 +17,8 @@ L4_PORT_MAX = '65535'
 TNOS_RULE_ID_MIN = 1
 TNOS_RULE_ID_MAX = 256
 
+TNOS_NAT_TRANS = {'trans-to':'trans-to', 'no-trans':'no-trans'}
+
 TNOS_ACTION = {'allow':'permit',
                'deny':'deny',
                'reject':'deny'}
@@ -24,6 +26,20 @@ TNOS_ACTION = {'allow':'permit',
 TNOS_INSERT_RULE_ACTION = {'insert_after':'after', 'insert_before':'before'}
 
 TN_POLICIES = {}
+
+
+def get_free_inner_id(used, min, max):
+    if used is None:
+        used = []
+    else:
+        used = used.split(',')
+
+    for i in range(min, max + 1):
+        if str(i) not in used:
+            used.append(str(i))
+            used = ','.join(used)
+            return (i, used)
+    return (None, None)
 
 class TNL3Address(object):
     @staticmethod
@@ -99,6 +115,76 @@ class TNService(object):
                            dst_port_max=svc.dst_port_max, dst_port_min=svc.dst_port_min,
                            src_port_max=svc.src_port_max, src_port_min=svc.src_port_min)
 
+class TNSnatRule(object):
+    @staticmethod
+    def create(context, router_id, trans, inner_id=None, srcaddr=None, dstaddr=None, trans_addr=None):
+        router = tnos.get_tn_router(context, router_id)
+
+        if inner_id is None:
+            (inner_id, used) = get_free_inner_id(router.snat_inner_use, TNOS_RULE_ID_MIN, TNOS_RULE_ID_MAX)
+
+        if inner_id is not None:
+            if srcaddr is not None:
+                srcaddr_name = router_id[-8:]+'-'+str(inner_id)+'-snat-saddr'
+                TNL3Address.create(context, router_id, srcaddr_name, srcaddr)
+            else:
+                srcaddr_name = 'Any'
+
+            if dstaddr is not None:
+                dstaddr_name = router_id[-8:] + '-' + str(inner_id) + '-dnat-daddr'
+                TNL3Address.create(context, router_id, dstaddr_name, dstaddr)
+            else:
+                dstaddr_name = 'Any'
+
+            if trans_addr is not None:
+                trans_addr_name = router_id[-8:] + '-' + str(inner_id) + '-snat-trans-addr'
+                TNL3Address.create(context, router_id, trans_addr_name, trans_addr)
+            else:
+                trans_addr_name = None
+
+            return tn_db.add_record(context, tn_db.Tn_Snat_rule, router_id=router_id, inner_id=inner_id, trans=trans,
+                                    srcaddr=srcaddr, srcaddr_name=srcaddr_name, dstaddr=dstaddr,
+                                    dstaddr_name=dstaddr_name, trans_addr=trans_addr, trans_addr_name=trans_addr_name)
+
+    @staticmethod
+    def delete(context, snat_rule):
+        TNL3Address.delete(context, snat_rule.router_id, snat_rule.srcaddr_name)
+        TNL3Address.delete(context, snat_rule.router_id, snat_rule.dstaddr_name)
+        TNL3Address.delete(context, snat_rule.router_id, snat_rule.trans_addr_name)
+        tn_db.delete_record(context, tn_db.Tn_Snat_rule, router_id=snat_rule.router_id, inner_id=snat_rule.inner_id)
+
+    @staticmethod
+    def gets(context, **kwargs):
+        return tn_db.query_records(context, tn_db.Tn_Snat_rule, **kwargs)
+
+    @staticmethod
+    def get(context, **kwargs):
+        return tn_db.query_record(context, tn_db.Tn_Snat_rule, **kwargs)
+
+    @staticmethod
+    def add_apply(context, client, rule):
+        LOG.debug('trace')
+        TNL3Address.add_apply(context, client, rule.router_id, rule.srcaddr_name)
+        TNL3Address.add_apply(context, client, rule.router_id, rule.dstaddr_name)
+        TNL3Address.add_apply(context, client, rule.router_id, rule.trans_addr_name)
+
+        client.request(templates.ADD_SNAT_RULE, id=rule.inner_id, trans=rule.trans,
+                       saddr=rule.srcaddr_name, daddr= rule.dstaddr_name, trans_addr=rule.trans_addr_name)
+
+    @staticmethod
+    def del_apply(context, client, rule):
+        LOG.debug('trace')
+        client.request(templates.DEL_SNAT_RULE, id=rule.inner_id, trans=rule.trans,
+                       saddr=rule.srcaddr_name, daddr= rule.dstaddr_name, trans_addr=rule.trans_addr_name)
+
+        TNL3Address.del_apply(context, client, rule.router_id, rule.srcaddr_name)
+        TNL3Address.del_apply(context, client, rule.router_id, rule.dstaddr_name)
+        TNL3Address.del_apply(context, client, rule.router_id, rule.trans_addr_name)
+
+    @staticmethod
+    def move_apply(context, client, src_rule, dst_rule, action):
+        client.request(templates.MOVE_SNAT_RULE, srcKey=src_rule.inner_id, dstKey=dst_rule.inner_id, action=action)
+
 class TNRule(object):
     @staticmethod
     def create(context, inner_id, rule_dict):
@@ -146,7 +232,7 @@ class TNRule(object):
     @staticmethod
     def init_address(context, rule_id, rule_name, addr_postfix, addr):
         if addr != None:
-            addr_name = rule_name+addr_postfix
+            addr_name = rule_name + addr_postfix
             TNL3Address.create(context, rule_id, addr_name, addr)
         else:
             addr_name = 'Any'
@@ -168,7 +254,7 @@ class TNRule(object):
             svc_name = 'ICMP'
 
         else:
-            svc_name = rule_name+'-svc'
+            svc_name = rule_name + '-svc'
             TNService.create(context, rule_id, svc_name, protocol, src_port, dst_port)
 
         return svc_name
@@ -217,20 +303,12 @@ class TNPolicy(object):
 
     @staticmethod
     def add_rule(context, policy, rule_dict):
-        if policy.rule_inner_use is None:
-            used = []
-        else:
-            used = policy.rule_inner_use.split(',')
+        (inner_id, used) = get_free_inner_id(policy.rule_inner_use, TNOS_RULE_ID_MIN, TNOS_RULE_ID_MAX)
+        if inner_id is not None:
+            rule = TNRule.create(context, inner_id, rule_dict)
+            TNPolicy.update(context, policy, rule_inner_use=used)
+            return rule
 
-        for i in range(TNOS_RULE_ID_MIN, TNOS_RULE_ID_MAX+1):
-            if str(i) not in used:
-                rule = TNRule.create(context, i, rule_dict)
-                used.append(str(i))
-                used = ','.join(used)
-
-                TNPolicy.update(context, policy, rule_inner_use=used)
-
-                return rule
 
     @staticmethod
     def del_rule(context, policy, rule):
@@ -389,7 +467,7 @@ class TNFirewall(object):
 
 def main_test(context):
 
-    router_id = '48026c38-9fb8-4fd6-ac56-237d17fd8b9f'
+    router_id = 'fe2b9562-95a3-4c3b-9aa5-d61d7ba32048'
 
     '''
     tn_fw = TNFirewall.create(context, '111111111', 'test1', 'test1-desc')
@@ -414,12 +492,9 @@ def main_test(context):
     TNPolicy.add_rule(context, tn_policy, rule_info)
 
     TNFirewall.apply_to_router(context, tn_fw, router_id)
-    '''
-
 
     tn_fw = TNFirewall.get(context, id='111111111')
 
-    '''
     rule_info = {
         'protocol': u'icmp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
         'destination_ip_address': None, 'firewall_policy_id': u'111111',
@@ -429,13 +504,34 @@ def main_test(context):
     }
 
     TNFirewall.add_rule_and_apply(context, tn_fw, rule_info)
-    '''
+    
 
     #TNFirewall.remove_rule_and_apply(context, tn_fw, '5683780b-77d3-4d1b-acb7-4360b7f48349')
     TNFirewall.move_rule_apply(context, tn_fw, '5683780b-77d3-4d1b-acb7-4360b7f48349',
                                '5683780b-77d3-4d1b-acb7-4360b7f48347', TNOS_INSERT_RULE_ACTION['insert_before'])
 
-    '''
+    
     TNFirewall.unapply_to_router(context, tn_fw, router_id)
     TNFirewall.delete(context, tn_fw)
     '''
+
+    client = tnos.get_tn_client(context, router_id)
+
+    '''
+    default_snat = TNSnatRule.create(context, router_id, TNOS_NAT_TRANS['trans-to'], inner_id=TNOS_RULE_ID_MAX, trans_addr='172.24.4.10/32')
+    TNSnatRule.add_apply(context, client, default_snat)
+
+    snat = TNSnatRule.create(context, router_id, TNOS_NAT_TRANS['no-trans'], srcaddr='10.1.1.1/24')
+    TNSnatRule.add_apply(context, client, snat)
+
+    '''
+    default_snat = TNSnatRule.get(context, router_id=router_id, inner_id=TNOS_RULE_ID_MAX)
+    snat = TNSnatRule.get(context, router_id=router_id, srcaddr='10.1.1.1/24')
+    #TNSnatRule.move_apply(context, client, snat, default_snat, TNOS_INSERT_RULE_ACTION['insert_before'])
+
+
+    TNSnatRule.del_apply(context, client, default_snat)
+    TNSnatRule.del_apply(context, client, snat)
+    TNSnatRule.delete(context, default_snat)
+    TNSnatRule.delete(context, snat)
+
