@@ -131,7 +131,7 @@ class TNSnatRule(object):
                 srcaddr_name = 'Any'
 
             if dstaddr is not None:
-                dstaddr_name = router_id[-8:] + '-' + str(inner_id) + '-dnat-daddr'
+                dstaddr_name = router_id[-8:] + '-' + str(inner_id) + '-snat-daddr'
                 TNL3Address.create(context, router_id, dstaddr_name, dstaddr)
             else:
                 dstaddr_name = 'Any'

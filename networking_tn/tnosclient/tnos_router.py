@@ -3,7 +3,7 @@ import time
 import subprocess
 import sys
 from oslo_log import log as logging
-from neutron.db.models import segment as segments_db
+from networking_tn._i18n import _, _LE
 
 from networking_tn.tnosclient import tnos_driver as tn_drv
 from networking_tn.tnosclient import ovs_cb as ovsctl
@@ -39,6 +39,18 @@ INT_BRIDGE_NAME = 'br-int'
 def tn_router_id_convert(router_id):
     id = str(router_id[0:8])
     return id
+
+
+def wait_for_ovs(context, port):
+    for i in range(10):
+        (port_name, tag) = ovsctl.get_port_tag(context, port['id'])
+
+        if port_name is None or tag == [] or tag is None:
+            time.sleep(3)
+        else:
+            return (port_name, tag)
+    return (None, None)
+    #raise Exception(_("add router interface to ovs fail!"))
 
 
 def get_extern_intf_name(intf_num, router_priv_id):
@@ -149,28 +161,38 @@ def init_intf(router_priv_id, manage_ip):
 
     subprocess.Popen(cmd, shell=True)
 
-
-def add_intf(context, router_id, port, is_gw):
+def add_intf(context, router_id, port, is_gw, dhcp_port=None):
 
     LOG.debug(port)
 
-    tag = get_vlan_id(context, port['network_id'])
-    port_name = 'qr-'+port['id'][:12]
+    (port_name, tag) = wait_for_ovs(context, port)
+    if port_name is None:
+        return None
+
     '''
     port_name = None
     tag = []
     for i in range(10):
-        (port_name, tag) = ovsctl.get_port_tag(context, port['id'])
+        if dhcp_port is not None:
+            # sometime cann't get port tag, so use dhcp port tag
+            (port_name, tag) = ovsctl.get_port_tag(context, dhcp_port['id'])
+
+            port_name = 'qr-' + port['id'][:12]
+        else:
+            (port_name, tag) = ovsctl.get_port_tag(context, port['id'])
+
         if port_name is None or tag == [] or tag is None:
             time.sleep(3)
         else:
             break
-    '''
-    if tag is None:
+
+    if port_name is None or tag == [] or tag is None:
         return None
+    '''
 
     cmd = 'sudo ip netns exec qrouter-'+router_id+' ifconfig '+port_name+' down'
     subprocess.Popen(cmd, shell=True)
+    LOG.debug(cmd)
 
     router = get_tn_router(context, router_id)
 
@@ -246,13 +268,6 @@ def get_intf_info(context, router_id):
         for intf in intfs:
             if info['mkey'] == intf.inner_name:
                 tn_db.update_record(context, intf, inner_id=info['mkey_id'], type=info['type'])
-
-def get_vlan_id(context, network_id):
-    ml2_net_seg = tn_db.query_record(context,
-                                           segments_db.NetworkSegment,
-                                           network_id=network_id)
-    LOG.debug(ml2_net_seg)
-    return getattr(ml2_net_seg, 'segmentation_id', None)
 
 
 def cfg_intf_ip(context, router_id, intf, ip_prefix):

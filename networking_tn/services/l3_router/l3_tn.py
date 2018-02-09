@@ -27,7 +27,9 @@ from neutron.db.models import l3 as l3_db
 from neutron.plugins.ml2 import db
 from neutron.services.l3_router import l3_router_plugin as router
 from neutron.db import l3_db as neu_l3_db
+from neutron.db import models_v2
 from neutron.db import api as db_api
+from neutron_lib import constants as cst
 
 from networking_tn._i18n import _, _LE
 from networking_tn.common import config
@@ -155,14 +157,13 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
     def delete_router(self, context, id):
         LOG.debug("delete_router: router id=%s", id)
+
         try:
             with db_api.context_manager.writer.using(context):
                 self._update_tn_router_route(context, id, del_all=True)
 
                 router = tn_db.query_record(context, l3_db.Router, id=id)
                 setattr(context, 'GUARD_TRANSACTION', False)
-
-
                 if getattr(router, 'tenant_id', None):
                     LOG.debug(router)
                     tnos_router.del_router(context, router['id'])
@@ -185,31 +186,35 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         info = super(TNL3ServicePlugin, self).add_router_interface(
             context, router_id, interface_info)
 
-        with context.session.begin(subtransactions=True):
-            port = db.get_port(context, info['port_id'])
-            port['admin_state_up'] = True
-            port['port'] = port
-            LOG.debug("TNL3ServicePlugin: "
-                      "context=%(context)s"
-                      "port=%(port)s "
-                      "info=%(info)r",
-                      {'context': context, 'port': port, 'info': info})
-            interface_info = info
-            subnet = self._core_plugin._get_subnet(context,interface_info['subnet_id'])
-            network_id = subnet['network_id']
-            tenant_id = port['tenant_id']
-            port_filters = {'network_id': [network_id],
-                            'device_owner': [DEVICE_OWNER_ROUTER_INTF]}
-            port_count = self._core_plugin.get_ports_count(context,
-                                                           port_filters)
-            # port count is checked against 2 since the current port is already
-            # added to db
-            if port_count == 2:
-                # This subnet is already part of some router
-                LOG.error(_LE("TNL3ServicePlugin: adding redundant "
+        port = db.get_port(context, info['port_id'])
+        port['admin_state_up'] = True
+        port['port'] = port
+        LOG.debug("TNL3ServicePlugin: "
+                  "context=%(context)s"
+                  "port=%(port)s "
+                  "info=%(info)r",
+                  {'context': context, 'port': port, 'info': info})
+        interface_info = info
+        subnet = self._core_plugin._get_subnet(context, interface_info['subnet_id'])
+        network_id = subnet['network_id']
+        tenant_id = port['tenant_id']
+        port_filters = {'network_id': [network_id],
+                        'device_owner': [DEVICE_OWNER_ROUTER_INTF]}
+        port_count = self._core_plugin.get_ports_count(context,
+                                                       port_filters)
+        # port count is checked against 2 since the current port is already
+        # added to db
+        if port_count == 2:
+            # This subnet is already part of some router
+            LOG.error(_LE("TNL3ServicePlugin: adding redundant "
+                          "router interface is not supported"))
+            raise Exception(_("TNL3ServicePlugin:adding redundant "
                               "router interface is not supported"))
-                raise Exception(_("TNL3ServicePlugin:adding redundant "
-                                  "router interface is not supported"))
+
+
+        tnos_router.wait_for_ovs(context, port)
+
+        with context.session.begin(subtransactions=True):
             try:
                 self._add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
             except Exception as e:
@@ -236,9 +241,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                                  trans_addr=ip+'/32')
                 tnos_firewall.TNSnatRule.add_apply(context, client, default_snat)
         else:
-            ports = tn_db.query_record(context, models_v2.Port, device_owner=cst.DEVICE_OWNER_DHCP,
-                                        network_id='06a07db6-3402-4ec0-bf98-0453e1476631')
-            tn_intf = tnos_router.add_intf(context, router_id, port, False)
+            dhcp_port = tn_db.query_record(context, models_v2.Port, device_owner=cst.DEVICE_OWNER_DHCP,
+                                        network_id=port['network_id'])
+
+
+            tn_intf = tnos_router.add_intf(context, router_id, port, False, dhcp_port=dhcp_port)
             if tn_intf is not None:
                 tnos_router.cfg_intf_ip(context, router_id, tn_intf, ip+'/24')
 
