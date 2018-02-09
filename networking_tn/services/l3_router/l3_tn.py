@@ -72,24 +72,24 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         if not router.get('router', None):
             return
 
-        with context.session.begin(subtransactions=True):
-            tenant_id = router['router']['tenant_id']
-            router_name = router['router']['name']
+        rlt = super(TNL3ServicePlugin, self).create_router(context, router)
 
-            rlt = super(TNL3ServicePlugin, self).create_router(context, router)
+        #with context.session.begin(subtransactions=True):
+        tenant_id = router['router']['tenant_id']
+        router_name = router['router']['name']
 
-            router_db = tn_db.query_record(context, l3_db.Router, name=router_name, tenant_id=tenant_id)
-            LOG.debug(router_db)
-            router_id = router_db['id']
+        router_db = tn_db.query_record(context, l3_db.Router, name=router_name, tenant_id=tenant_id)
+        LOG.debug(router_db)
+        router_id = router_db['id']
 
-            try:
-                tnos_router.create_router(context, router_id, tenant_id, router_name,
-                                   self._tn_info["image_path"], self._tn_info['address'])
+        try:
+            tnos_router.create_router(context, router_id, tenant_id, router_name,
+                               self._tn_info["image_path"], self._tn_info['address'])
 
-            except Exception as e:
-                LOG.error("Failed to create_router router=%(router)s",
-                          {"router": router})
-                resources.Exinfo(e)
+        except Exception as e:
+            LOG.error("Failed to create_router router=%(router)s",
+                      {"router": router})
+            resources.Exinfo(e)
 
         return rlt
 
@@ -98,16 +98,16 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                   {'id': id, 'router': router})
 
         updated = (super(TNL3ServicePlugin, self).update_router(context, id, router))
-        with context.session.begin(subtransactions=True):
-            LOG.debug(updated)
+        #with context.session.begin(subtransactions=True):
+        LOG.debug(updated)
 
-            gateway = router['router'].get('external_gateway_info')
-            if gateway is not None:
-                self._update_tn_router_gw(context, id, gateway, updated)
+        gateway = router['router'].get('external_gateway_info')
+        if gateway is not None:
+            self._update_tn_router_gw(context, id, gateway, updated)
 
-            routes = router['router'].get('routes')
-            if routes is not None:
-                self._update_tn_router_route(context, id, routes)
+        routes = router['router'].get('routes')
+        if routes is not None:
+            self._update_tn_router_route(context, id, routes)
 
         return updated
 
@@ -159,14 +159,13 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         LOG.debug("delete_router: router id=%s", id)
 
         try:
-            with db_api.context_manager.writer.using(context):
-                self._update_tn_router_route(context, id, del_all=True)
+            self._update_tn_router_route(context, id, del_all=True)
 
-                router = tn_db.query_record(context, l3_db.Router, id=id)
-                setattr(context, 'GUARD_TRANSACTION', False)
-                if getattr(router, 'tenant_id', None):
-                    LOG.debug(router)
-                    tnos_router.del_router(context, router['id'])
+            router = tn_db.query_record(context, l3_db.Router, id=id)
+            setattr(context, 'GUARD_TRANSACTION', False)
+            if getattr(router, 'tenant_id', None):
+                LOG.debug(router)
+                tnos_router.del_router(context, router['id'])
 
         except Exception as e:
             with excutils.save_and_reraise_exception():
@@ -214,18 +213,18 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         tnos_router.wait_for_ovs(context, port)
 
-        with context.session.begin(subtransactions=True):
-            try:
-                self._add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
-            except Exception as e:
-                LOG.error(_LE("Failed to create TN resources to add "
-                            "router interface. info=%(info)s, "
-                            "router_id=%(router_id)s"),
-                          {"info": info, "router_id": router_id})
+        #with context.session.begin(subtransactions=True):
+        try:
+            self._add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
+        except Exception as e:
+            LOG.error(_LE("Failed to create TN resources to add "
+                        "router interface. info=%(info)s, "
+                        "router_id=%(router_id)s"),
+                      {"info": info, "router_id": router_id})
 
-                with excutils.save_and_reraise_exception():
-                    self.remove_router_interface(context, router_id,
-                                                 interface_info)
+
+            self.remove_router_interface(context, router_id, interface_info)
+
         return info
 
     def _add_tn_router_interface(self, context, router_id, port, ip):
@@ -256,9 +255,9 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
                 default_snat = tnos_firewall.TNSnatRule.get(context, router_id=router_id,
                                                             inner_id=tnos_firewall.TNOS_RULE_ID_MAX)
-
-                tnos_firewall.TNSnatRule.move_apply(context, client, snat, default_snat,
-                                                    tnos_firewall.TNOS_INSERT_RULE_ACTION['insert_before'])
+                if default_snat is not None:
+                    tnos_firewall.TNSnatRule.move_apply(context, client, snat, default_snat,
+                                                        tnos_firewall.TNOS_INSERT_RULE_ACTION['insert_before'])
 
 
     def remove_router_interface(self, context, router_id, interface_info):
@@ -270,10 +269,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
 
         client = tnos_router.get_tn_client(context, router_id)
-        with context.session.begin(subtransactions=True):
-            tn_intf = tnos_router.get_intf(context, id=interface_info['port_id'])
-            LOG.debug(tn_intf)
+        #with context.session.begin(subtransactions=True):
+        tn_intf = tnos_router.get_intf(context, id=interface_info['port_id'])
+        LOG.debug(tn_intf)
 
+        if tn_intf is not None:
             if tn_intf.is_gw == 'True':
                 default_snat = tnos_firewall.TNSnatRule.get(context, router_id=router_id,
                                                             inner_id=tnos_firewall.TNOS_RULE_ID_MAX)

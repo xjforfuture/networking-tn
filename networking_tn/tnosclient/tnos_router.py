@@ -255,7 +255,7 @@ def del_intf(context, router_id, intf_id=None, is_gw=False):
 
 
 def get_intf(context, **kwargs):
-    return tn_db.query_records(context, tn_db.Tn_Interface, **kwargs)
+    return tn_db.query_record(context, tn_db.Tn_Interface, **kwargs)
 
 
 def get_intf_info(context, router_id):
