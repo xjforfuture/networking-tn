@@ -161,7 +161,7 @@ def init_intf(router_priv_id, manage_ip):
 
     subprocess.Popen(cmd, shell=True)
 
-def add_intf(context, router_id, port, is_gw, dhcp_port=None):
+def add_intf(context, router_id, port, is_gw):
 
     LOG.debug(port)
 

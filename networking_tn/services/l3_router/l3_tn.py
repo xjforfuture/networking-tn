@@ -210,9 +210,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             raise Exception(_("TNL3ServicePlugin:adding redundant "
                               "router interface is not supported"))
 
-
-        tnos_router.wait_for_ovs(context, port)
-
         #with context.session.begin(subtransactions=True):
         try:
             self._add_tn_router_interface(context, router_id, port, subnet['gateway_ip'])
@@ -239,12 +236,9 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                                                  inner_id=tnos_firewall.TNOS_RULE_ID_MAX,
                                                  trans_addr=ip+'/32')
                 tnos_firewall.TNSnatRule.add_apply(context, client, default_snat)
+
         else:
-            dhcp_port = tn_db.query_record(context, models_v2.Port, device_owner=cst.DEVICE_OWNER_DHCP,
-                                        network_id=port['network_id'])
-
-
-            tn_intf = tnos_router.add_intf(context, router_id, port, False, dhcp_port=dhcp_port)
+            tn_intf = tnos_router.add_intf(context, router_id, port, False)
             if tn_intf is not None:
                 tnos_router.cfg_intf_ip(context, router_id, tn_intf, ip+'/24')
 
