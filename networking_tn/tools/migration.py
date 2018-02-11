@@ -14,6 +14,7 @@
 
 import time
 import sys
+import operator
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -132,11 +133,8 @@ class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
         router_name = router['name']
 
         try:
-            tn_router = tnos_router.TnosRouter(context, router_id, None, router_name, self._tn_info["image_path"],
-                                        self._tn_info['address'])
-            tn_client = tnos_router.get_tn_client(router_id)
-            tn_router.get_intf_info(tn_client)
-            tn_router.store_router()
+            tnos_router.create_router(context, router_id, None, router_name,
+                               self._tn_info["image_path"], self._tn_info['address'])
 
         except Exception as e:
             LOG.error("Failed to create_router router=%(router)s",
@@ -146,14 +144,17 @@ class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
 
     def add_router_interface(self, context, port):
         """creates interface on the tn device."""
-        ip = port['fixed_ips'][0]['ip_address']
-        if '.' in ip:
-            LOG.debug(port)
-            router_id = port['device_id']
-            try:
-                self._add_tn_router_interface(context, router_id, port, ip)
-            except Exception as e:
-                raise
+        fixed_ips = port['fixed_ips'][0]['ip_address']
+
+        for fixed_ip in fixed_ips:
+            ip = fixed_ip['ip_address']
+
+            if '.' in ip:
+                router_id = port['device_id']
+                try:
+                    self._add_tn_router_interface(context, router_id, port, ip)
+                except Exception:
+                    LOG.error('add interface to router fail')
 
     def _get_floatingip(self, context, id):
         return tn_db.query_record(context, l3_models.FloatingIP, id=id)
@@ -162,18 +163,7 @@ class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
     def create_floatingip(self, context, floatingip, returned_obj):
         """Create floating IP.
         """
-        LOG.debug(_("create_floatingip: floatingip=%s" % floatingip))
-        self._allocate_floatingip(context, returned_obj)
-        if returned_obj.get('port_id', None):
-            if not floatingip['floatingip'].get('fixed_ip_address', None):
-                floatingip['floatingip']['fixed_ip_address'] = \
-                    returned_obj.get('fixed_ip_address')
-            self._associate_floatingip(context, returned_obj['id'],
-                                       floatingip)
-            self.update_floatingip_status(context, returned_obj,
-                                l3_constants.FLOATINGIP_STATUS_ACTIVE,
-                                id=returned_obj['id'])
-        return returned_obj
+        pass
 
 
 class Fake_TNFirewallPlugin(fw_plugin.TNFirewallPlugin):
@@ -183,34 +173,40 @@ class Fake_TNFirewallPlugin(fw_plugin.TNFirewallPlugin):
 
         LOG.debug(fw_with_rules)
 
-        tn_fw = tnos_firewall.TNFirewall(fw_with_rules['id'], fw_with_rules['name'], fw_with_rules['description'])
-        tn_policy = tn_fw.add_policy(fw_with_rules['firewall_policy_id'])
         rules = fw_with_rules['firewall_rule_list']
+        for rule in rules:
+            LOG.debug(rule)
 
-        if tn_policy.rules == []:
-            LOG.debug('trace')
-            for rule in rules:
-                LOG.debug('trace')
-                tn_policy.add_rule(rule)
-
+        '''
         try:
-            for router_id in fw_with_rules['add-router-ids']:
-                LOG.debug('router %s', router_id)
-                tn_fw.apply_to_router(router_id)
-        except:
+            self._create_tn_firewall(context, fw_with_rules)
+        except Exception:
+            LOG.error('create firewall fail')
             raise
-        else:
-            tn_fw.store()
+        '''
 
     def get_firewalls(self, context):
+        return tn_db.query_records(context, firewall_db.Firewall)
 
-        fw_list = tn_db.query_records(context, firewall_db.Firewall)
-        return fw_list
+    def get_firewall(self, context, id):
+        return tn_db.query_record(context, firewall_db.Firewall, id=id)
 
-    def get_rules(self, context, policy_id):
-        rule_list = tn_db.query_records(context, firewall_db.FirewallRule, firewall_policy_id=policy_id)
+    def get_firewall_rules(self, context, policy_id):
+        return tn_db.query_records(context, firewall_db.FirewallRule, firewall_policy_id=policy_id)
 
-        return rule_list
+    def _make_firewall_dict_with_rules(self, context, firewall_id):
+        firewall = self.get_firewall(context, firewall_id)
+        fw_policy_id = firewall['firewall_policy_id']
+        if fw_policy_id:
+            fw_rules_list = self.get_firewall_rules(context, fw_policy_id)
+            fw_rules_list = sorted(fw_rules_list, key=operator.itemgetter('position'))
+            firewall['firewall_rule_list'] = fw_rules_list
+        else:
+            firewall['firewall_rule_list'] = []
+        # FIXME(Sumit): If the size of the firewall object we are creating
+        # here exceeds the largest message size supported by rabbit/qpid
+        # then we will have a problem.
+        return firewall
 
 def reset(dictionary):
     for key, value in dictionary.iteritems():
@@ -339,10 +335,9 @@ def firewall_migration(context, fw_plugin):
     fw_list = fw_plugin.get_firewalls(context)
 
     for fw in fw_list:
-        rule_list = fw_plugin.get_rules(context, fw['firewall_policy_id'])
-        for rule in rule_list:
-            LOG.debug(rule)
-            #fw_plugin.create_firewall(context, rule)
+        fw_with_rules = fw_plugin._make_firewall_dict_with_rules(context, fw['id'])
+
+        fw_plugin.create_firewall(context, fw_with_rules)
 
 def floatingip_migration(context, l3_driver):
     """
@@ -424,17 +419,17 @@ def test(context):
         LOG.debug(str(vlan_id))
 
 def main():
-    try:
-        context = Fake_context()
-        l3_driver = Fake_TNL3ServicePlugin()
-        router_migration(context, l3_driver)
-        port_migration(context, l3_driver)
+    #try:
+    context = Fake_context()
+    #l3_driver = Fake_TNL3ServicePlugin()
+    #router_migration(context, l3_driver)
+    #port_migration(context, l3_driver)
 
-        fw_plugin = Fake_TNFirewallPlugin()
-        firewall_migration(context, fw_plugin)
+    fw_plugin = Fake_TNFirewallPlugin()
+    firewall_migration(context, fw_plugin)
 
-    except Exception as e:
-        raise(e)
+    #except Exception as e:
+    #    raise(e)
 
     #context = Fake_context()
     #test_db(context)
