@@ -424,7 +424,6 @@ def test(context):
         LOG.debug(str(vlan_id))
 
 def main():
-    '''
     try:
         context = Fake_context()
         l3_driver = Fake_TNL3ServicePlugin()
@@ -436,13 +435,12 @@ def main():
 
     except Exception as e:
         raise(e)
-    '''
 
-    context = Fake_context()
+    #context = Fake_context()
     #test_db(context)
     #tnos_router.router_test(context)
     #tnos_firewall.main_test(context)
-    test(context)
+    #test(context)
 
 if __name__ == "__main__":
     main()
