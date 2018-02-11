@@ -226,11 +226,8 @@ def add_intf(context, router_id, port, is_gw):
     return intf
 
 
-def del_intf(context, router_id, intf_id=None, is_gw=False):
-    if is_gw is True:
-        intf = tn_db.query_record(context, tn_db.Tn_Interface, router_id=router_id, is_gw='True')
-    else:
-        intf = tn_db.query_record(context, tn_db.Tn_Interface, id=intf_id)
+def del_intf(context, router_id, intf_id):
+    intf = tn_db.query_record(context, tn_db.Tn_Interface, id=intf_id)
 
     if intf is not None:
         api_client = get_tn_client(context, router_id)

@@ -291,7 +291,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 tnos_firewall.TNSnatRule.del_apply(context, client, snat)
                 tnos_firewall.TNSnatRule.delete(context, snat)
 
-            tnos_router.del_intf(context, router_id, intf_id=port_id)
+            tnos_router.del_intf(context, router_id, intf_id=tn_intf.id)
 
     '''
     def _add_interface_by_subnet(self, context, router, subnet_id, owner):
