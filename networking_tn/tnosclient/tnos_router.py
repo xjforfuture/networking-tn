@@ -133,12 +133,6 @@ def create_router(context, id, tenant_id, name, image_path='tnos.qcow2', manage_
 
 
 def del_router(context, router_id):
-    # delete gateway interface
-    intf = tn_db.query_record(context, tn_db.Tn_Interface, router_id=router_id, is_gw='True')
-    if intf is not None:
-        ovsctl.del_port(context, INT_BRIDGE_NAME, intf.extern_name)
-        tn_db.delete_record(context, tn_db.Tn_Interface, id=intf.id)
-
     # kill vm and delete router
     router = tn_db.query_record(context, tn_db.Tn_Router, id=router_id)
     if router is not None:
@@ -192,10 +186,9 @@ def add_intf(context, router_id, port, is_gw):
 
     cmd = 'sudo ip netns exec qrouter-'+router_id+' ifconfig '+port_name+' down'
     subprocess.Popen(cmd, shell=True)
-    LOG.debug(cmd)
+    ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
 
     router = get_tn_router(context, router_id)
-
     if is_gw:
         extern_name = get_extern_intf_name(GW_INTF, router.priv_id)
         inner_name = get_inner_intf_name(GW_INTF)
@@ -226,6 +219,8 @@ def add_intf(context, router_id, port, is_gw):
                                 extern_name=extern_name, inner_name=sub_inner_name, state='up',
                                 vlan_id=tag, is_gw='False', is_sub='True')
 
+    cmd = 'sudo ifconfig %s up \n' % intf.extern_name
+    subprocess.Popen(cmd, shell=True)
     get_intf_info(context, router_id)
 
     return intf

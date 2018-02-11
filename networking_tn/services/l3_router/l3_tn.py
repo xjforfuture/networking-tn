@@ -124,7 +124,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 self._add_tn_router_interface(context, router_id, port, ip)
         else:
             # del gatewayl
-            tnos_router.del_intf(context, router_id, is_gw=True)
+            self._remove_tn_router_interface(context, router_id, is_gw=True)
 
     def _update_tn_router_route(self, context, router_id, routes=[], del_all=False):
 
@@ -160,6 +160,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         try:
             self._update_tn_router_route(context, id, del_all=True)
+            self._remove_tn_router_interface(context, id, is_gw=True)
 
             router = tn_db.query_record(context, l3_db.Router, id=id)
             setattr(context, 'GUARD_TRANSACTION', False)
@@ -235,6 +236,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 default_snat = tnos_firewall.TNSnatRule.create(context, router_id, tnos_firewall.TNOS_NAT_TRANS['trans-to'],
                                                  inner_id=tnos_firewall.TNOS_RULE_ID_MAX,
                                                  trans_addr=ip+'/32')
+                LOG.debug('trace')
                 tnos_firewall.TNSnatRule.add_apply(context, client, default_snat)
 
         else:
@@ -262,13 +264,24 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                   {'router_id': router_id, 'interface_info': interface_info})
         info = super(TNL3ServicePlugin, self).remove_router_interface(context, router_id, interface_info)
 
-        client = tnos_router.get_tn_client(context, router_id)
         #with context.session.begin(subtransactions=True):
-        tn_intf = tnos_router.get_intf(context, id=interface_info['port_id'])
+        client = tnos_router.get_tn_client(context, router_id)
+        self._remove_tn_router_interface(context, router_id, port_id=interface_info['port_id'])
+        return info
+
+    def _remove_tn_router_interface(self, context, router_id, port_id=None, is_gw=False):
+        client = tnos_router.get_tn_client(context, router_id)
+        # with context.session.begin(subtransactions=True):
+        if is_gw == True:
+            tn_intf = tnos_router.get_intf(context, router_id=router_id, is_gw='True')
+
+        if port_id is not None:
+            tn_intf = tnos_router.get_intf(context, id=port_id)
+
         LOG.debug(tn_intf)
 
         if tn_intf is not None:
-            if tn_intf.is_gw == 'True':
+            if is_gw == True:
                 default_snat = tnos_firewall.TNSnatRule.get(context, router_id=router_id,
                                                             inner_id=tnos_firewall.TNOS_RULE_ID_MAX)
                 tnos_firewall.TNSnatRule.del_apply(context, client, default_snat)
@@ -278,9 +291,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 tnos_firewall.TNSnatRule.del_apply(context, client, snat)
                 tnos_firewall.TNSnatRule.delete(context, snat)
 
-            tnos_router.del_intf(context, router_id, intf_id=interface_info['port_id'])
-
-        return info
+            tnos_router.del_intf(context, router_id, intf_id=port_id)
 
     '''
     def _add_interface_by_subnet(self, context, router, subnet_id, owner):
