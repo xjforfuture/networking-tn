@@ -292,13 +292,10 @@ def port_migration(context, l3_driver):
             cls2dict(record, port)
             db_routerport = tn_db.query_record(context, l3_models.RouterPort, port_id=record.id)
 
-            if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF, ROUTER_INTF]:
+            if getattr(db_routerport, 'port_type', None) in [ROUTER_INTF, ROUTER_GW]:
                 l3_driver.add_router_interface(context, port)
 
             p.update()
-
-
-
 
 
 def router_migration(context, l3_driver):
@@ -329,6 +326,11 @@ def router_migration(context, l3_driver):
             reset(router_obj)
             cls2dict(record, router_obj)
             l3_driver.create_router(context, router)
+
+            route = tn_db.query_records(context, l3_models.RouterRoute, router_id=router['router']['id'])
+            if route is not None or route != []:
+                l3_driver._update_tn_router_route(context, router['router']['id'], route)
+
             p.update()
 
 def firewall_migration(context, fw_plugin):
