@@ -47,7 +47,7 @@ def upgrade():
     op.create_table('tn_routers',
                     sa.Column('id', mysql.VARCHAR(length=64), nullable=False),
                     sa.Column('priv_id', mysql.VARCHAR(length=32), nullable=False),
-                    sa.Column('tenant_id', mysql.VARCHAR(length=64), nullable=False),
+                    sa.Column('tenant_id', mysql.VARCHAR(length=64), nullable=True),
                     sa.Column('name', mysql.VARCHAR(length=64), nullable=True),
                     sa.Column('manage_ip', mysql.VARCHAR(length=32), nullable=False),
                     sa.Column('image_name', mysql.VARCHAR(length=128), nullable=False),

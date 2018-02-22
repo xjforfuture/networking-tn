@@ -133,7 +133,7 @@ class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
         router_name = router['name']
 
         try:
-            tnos_router.create_router(context, router_id, None, router_name,
+            tnos_router.create_router(context, router_id, '', router_name,
                                self._tn_info["image_path"], self._tn_info['address'])
 
         except Exception as e:
@@ -144,7 +144,7 @@ class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
 
     def add_router_interface(self, context, port):
         """creates interface on the tn device."""
-        fixed_ips = port['fixed_ips'][0]['ip_address']
+        fixed_ips = port['fixed_ips']
 
         for fixed_ip in fixed_ips:
             ip = fixed_ip['ip_address']
@@ -155,6 +155,8 @@ class Fake_TNL3ServicePlugin(router_plugin.TNL3ServicePlugin):
                     self._add_tn_router_interface(context, router_id, port, ip)
                 except Exception:
                     LOG.error('add interface to router fail')
+                finally:
+                    break
 
     def _get_floatingip(self, context, id):
         return tn_db.query_record(context, l3_models.FloatingIP, id=id)
@@ -174,6 +176,8 @@ class Fake_TNFirewallPlugin(fw_plugin.TNFirewallPlugin):
         LOG.debug(fw_with_rules)
 
         # rules = fw_with_rules['firewall_rule_list']
+        if fw_with_rules.get('add-router-ids', None) is None:
+            return
 
         try:
             self._create_tn_firewall(context, fw_with_rules)
@@ -416,17 +420,17 @@ def test(context):
 
 def main():
 
-    try:
-        context = Fake_context()
-        l3_driver = Fake_TNL3ServicePlugin()
-        router_migration(context, l3_driver)
-        port_migration(context, l3_driver)
+    #try:
+    context = Fake_context()
+    l3_driver = Fake_TNL3ServicePlugin()
+    router_migration(context, l3_driver)
+    port_migration(context, l3_driver)
 
-        fw_plugin = Fake_TNFirewallPlugin()
-        firewall_migration(context, fw_plugin)
+    fw_plugin = Fake_TNFirewallPlugin()
+    firewall_migration(context, fw_plugin)
 
-    except Exception as e:
-        raise(e)
+    #except Exception as e:
+    #    raise(e)
 
     #context = Fake_context()
     #test_db(context)

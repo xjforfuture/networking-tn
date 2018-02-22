@@ -69,6 +69,7 @@ def get_tn_client(context, router_id):
     if router_id in TNOS_CLIENT:
         return TNOS_CLIENT[router_id]
 
+    # for test
     if router_id == '999999':
         TNOS_CLIENT[router_id] = config.get_apiclient('88.1.1.1')
         return TNOS_CLIENT[router_id]
@@ -163,30 +164,9 @@ def add_intf(context, router_id, port, is_gw):
     if port_name is None:
         return None
 
-    '''
-    port_name = None
-    tag = []
-    for i in range(10):
-        if dhcp_port is not None:
-            # sometime cann't get port tag, so use dhcp port tag
-            (port_name, tag) = ovsctl.get_port_tag(context, dhcp_port['id'])
-
-            port_name = 'qr-' + port['id'][:12]
-        else:
-            (port_name, tag) = ovsctl.get_port_tag(context, port['id'])
-
-        if port_name is None or tag == [] or tag is None:
-            time.sleep(3)
-        else:
-            break
-
-    if port_name is None or tag == [] or tag is None:
-        return None
-    '''
-
     cmd = 'sudo ip netns exec qrouter-'+router_id+' ifconfig '+port_name+' down'
     subprocess.Popen(cmd, shell=True)
-    ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
+    # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
 
     router = get_tn_router(context, router_id)
     if is_gw:

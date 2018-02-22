@@ -271,7 +271,7 @@ class TNFirewallPlugin(
                 LOG.debug('router %s', router_id)
                 tnos.TNFirewall.apply_to_router(context, tn_fw, router_id)
         except Exception:
-            self.delete_firewall(context, fw_with_rules['id'])
+            #self.delete_firewall(context, fw_with_rules['id'])
             raise
         else:
             self.update_firewall_status(context, fw_with_rules['id'], nl_constants.ACTIVE)

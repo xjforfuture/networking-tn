@@ -196,6 +196,8 @@ class TNRule(object):
          'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'}
          '''
 
+        LOG.debug('display rule %s', rule_dict)
+
         id = rule_dict['id']
         name = rule_dict['name']+'-'+str(inner_id)
         desc = rule_dict['description']
@@ -207,8 +209,23 @@ class TNRule(object):
         srcaddr = TNRule.init_address(context, id, name, '-sa', rule_dict['source_ip_address'])
         dstaddr = TNRule.init_address(context, id, name, '-da', rule_dict['destination_ip_address'])
 
-        service = TNRule.init_service(context, id, name, rule_dict['protocol'],
-                                      rule_dict['source_port'], rule_dict['destination_port'])
+        if rule_dict.get('source_port', False) != False:
+            service = TNRule.init_service(context, id, name, rule_dict['protocol'],
+                                          rule_dict['source_port'], rule_dict['destination_port'])
+
+        else:
+            if rule_dict.get('source_port_range_min', None) is not None:
+                source_port = rule_dict['source_port_range_min'] + ':' + rule_dict['source_port_range_max']
+            else:
+                source_port = None
+
+            if rule_dict.get('destination_port_range_min', None) is not None:
+                destination_port = rule_dict['destination_port_range_min'] + ':' + rule_dict['destination_port_range_max']
+            else:
+                destination_port = None
+
+            service = TNRule.init_service(context, id, name, rule_dict['protocol'], source_port, destination_port)
+
 
         return tn_db.add_record(context, tn_db.Tn_Rule, id=id, policy_id=policy_id, inner_id=inner_id,
                          name=name, desc=desc, protocol=protocol, action=action, enable=enable,
