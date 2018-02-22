@@ -415,17 +415,18 @@ def test(context):
         LOG.debug(str(vlan_id))
 
 def main():
-    #try:
-    context = Fake_context()
-    #l3_driver = Fake_TNL3ServicePlugin()
-    #router_migration(context, l3_driver)
-    #port_migration(context, l3_driver)
 
-    fw_plugin = Fake_TNFirewallPlugin()
-    firewall_migration(context, fw_plugin)
+    try:
+        context = Fake_context()
+        l3_driver = Fake_TNL3ServicePlugin()
+        router_migration(context, l3_driver)
+        port_migration(context, l3_driver)
 
-    #except Exception as e:
-    #    raise(e)
+        fw_plugin = Fake_TNFirewallPlugin()
+        firewall_migration(context, fw_plugin)
+
+    except Exception as e:
+        raise(e)
 
     #context = Fake_context()
     #test_db(context)
