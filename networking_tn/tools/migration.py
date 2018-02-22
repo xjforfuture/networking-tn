@@ -173,17 +173,13 @@ class Fake_TNFirewallPlugin(fw_plugin.TNFirewallPlugin):
 
         LOG.debug(fw_with_rules)
 
-        rules = fw_with_rules['firewall_rule_list']
-        for rule in rules:
-            LOG.debug(rule)
+        # rules = fw_with_rules['firewall_rule_list']
 
-        '''
         try:
             self._create_tn_firewall(context, fw_with_rules)
         except Exception:
             LOG.error('create firewall fail')
             raise
-        '''
 
     def get_firewalls(self, context):
         return tn_db.query_records(context, firewall_db.Firewall)
