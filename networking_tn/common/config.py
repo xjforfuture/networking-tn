@@ -100,6 +100,5 @@ def get_apiclient(address=None):
     api_server = [(address if address else tn_info['address'], tn_info['port'],
                    'https' == tn_info['protocol'])]
 
-    return client.FortiosApiClient(
-        api_server, tn_info['username'], tn_info['password'])
+    return client.FortiosApiClient(api_server, tn_info['username'], tn_info['password'])
 

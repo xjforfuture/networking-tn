@@ -31,6 +31,7 @@ from neutron.objects.network import ExternalNetwork
 from oslo_db.sqlalchemy import session
 import neutron.plugins.ml2.models as ml2_db
 from neutron_fwaas.db.firewall import firewall_db
+from neutron_fwaas.db.firewall import firewall_router_insertion_db as fw_rt_db
 
 from neutron_lib import constants as cst
 
@@ -339,6 +340,9 @@ def firewall_migration(context, fw_plugin):
     for fw in fw_list:
         fw_with_rules = fw_plugin._make_firewall_dict_with_rules(context, fw['id'])
 
+        fw_routers = tn_db.query_records(context, fw_rt_db.FirewallRouterAssociation, fw_id=fw['id'])
+        fw_with_rules['add-router-ids'] = [fw_router.router_id for fw_router in fw_routers]
+        LOG.debug(fw_with_rules['add-router-ids'])
         fw_plugin.create_firewall(context, fw_with_rules)
 
 def floatingip_migration(context, l3_driver):

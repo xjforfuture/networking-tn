@@ -20,6 +20,8 @@ else:
     LOG = logging.getLogger(__name__)
 
 TNOS_CLIENT = {}
+first= None
+sec=None
 
 ROUTER_MAX_INTF = 3
 MANAGE_INTF = 0
@@ -77,7 +79,6 @@ def get_tn_client(context, router_id):
     tn_router = tn_db.query_record(context, tn_db.Tn_Router, id=router_id)
     if tn_router is not None:
         TNOS_CLIENT[router_id] = config.get_apiclient(tn_router.manage_ip)
-
         return TNOS_CLIENT[router_id]
 
 
@@ -139,6 +140,7 @@ def del_router(context, router_id):
     if router is not None:
         tn_drv.destroy_vm(router_id, router.image_name)
         tn_db.delete_record(context, tn_db.Tn_Router, id=router_id)
+        del TNOS_CLIENT[router_id]
 
 
 def init_intf(router_priv_id, manage_ip):

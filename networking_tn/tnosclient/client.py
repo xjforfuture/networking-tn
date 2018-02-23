@@ -37,7 +37,7 @@ from networking_tn.tnosclient import templates
 LOG = logging.getLogger(__name__)
 
 
-@singleton.singleton
+#@singleton.singleton
 class FortiosApiClient(eventlet_client.EventletApiClient):
     """The FortiOS API Client."""
 

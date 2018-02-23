@@ -215,12 +215,12 @@ class TNRule(object):
 
         else:
             if rule_dict.get('source_port_range_min', None) is not None:
-                source_port = rule_dict['source_port_range_min'] + ':' + rule_dict['source_port_range_max']
+                source_port = str(rule_dict['source_port_range_min']) + ':' + str(rule_dict['source_port_range_max'])
             else:
                 source_port = None
 
             if rule_dict.get('destination_port_range_min', None) is not None:
-                destination_port = rule_dict['destination_port_range_min'] + ':' + rule_dict['destination_port_range_max']
+                destination_port = str(rule_dict['destination_port_range_min']) + ':' + str(rule_dict['destination_port_range_max'])
             else:
                 destination_port = None
 
