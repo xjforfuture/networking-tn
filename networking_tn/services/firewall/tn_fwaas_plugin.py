@@ -32,6 +32,7 @@ from neutron_fwaas.db.firewall import firewall_db
 from neutron_fwaas.db.firewall import firewall_router_insertion_db
 
 from networking_tn.tnosclient import tnos_firewall as tnos
+from networking_tn.db import tn_db
 
 LOG = logging.getLogger(__name__)
 
@@ -278,7 +279,7 @@ class TNFirewallPlugin(
 
 
     def update_firewall(self, context, id, firewall):
-        LOG.debug("update_firewall() called on firewall %s", id)
+        LOG.debug("update_firewall() called on firewall %s content %s", id, firewall)
 
         self._ensure_update_firewall(context, id)
         # pop router_id as this goes in the router association db
@@ -323,20 +324,6 @@ class TNFirewallPlugin(
         fw_with_rules['last-router'] = not fw_new_rtrs
 
         LOG.debug(fw_with_rules)
-
-        '''
-            {'status': u'PENDING_CREATE', 'description': u'5555',
-             'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc', 'del-router-ids': [],
-             'id': u'0a70bcd8-66cb-4235-b8b4-7dda9a3256bf', 'router_ids': [], 'name': u'test-firewall-5',
-             'admin_state_up': True, 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19',
-             'add-router-ids': [u'afca6971-49ff-4b1f-a3a1-ec8cc1a633d0'], 'shared': None,
-             'project_id': u'38f7e18b122949f39473e8c6d76aae19', 'firewall_rule_list': [
-                {'protocol': u'tcp', 'description': u'123', 'source_port': None, 'source_ip_address': u'10.1.1.1/24',
-                 'destination_ip_address': None, 'firewall_policy_id': u'86451772-69f4-438d-a27c-414997b5c1cc',
-                 'position': 1, 'destination_port': None, 'id': u'5683780b-77d3-4d1b-acb7-4360b7f48349',
-                 'name': u'test-rule-2', 'tenant_id': u'38f7e18b122949f39473e8c6d76aae19', 'enabled': True,
-                 'action': 'allow', 'ip_version': 4, 'shared': False, 'project_id': u'38f7e18b122949f39473e8c6d76aae19'}]}
-        '''
 
         tn_fw = tnos.TNFirewall.get(context, id=id)
         # tn_fw.name = fw_with_rules['name']
@@ -393,6 +380,21 @@ class TNFirewallPlugin(
 
         return fw
 
+    def update_firewall_for_delete_router(self, context, router_id):
+        LOG.debug("fwaas delete_router() called, router_id: %(rtid)s",
+                  {'rtid': router_id})
+        cls = firewall_router_insertion_db.FirewallRouterAssociation
+        db_fw_rt = tn_db.query_record(context, cls, router_id=router_id)
+        if not db_fw_rt:
+            return None
+
+        fw_rts = tn_db.query_records(context, cls, fw_id=db_fw_rt.fw_id)
+        routers = [fw_rt.router_id for fw_rt in fw_rts]
+        routers.remove(router_id)
+        firewall = {u'firewall': {'router_ids': routers}}
+        return self.update_firewall(context, db_fw_rt.fw_id, firewall)
+
+
     def delete_db_firewall_object(self, context, id):
         LOG.debug('trace')
         super(TNFirewallPlugin, self).delete_firewall(context, id)
@@ -404,16 +406,19 @@ class TNFirewallPlugin(
         fw_delete_rtrs = self.get_firewall_routers(context, id)
         fw_with_rules['del-router-ids'] = fw_delete_rtrs
         fw_with_rules['add-router-ids'] = []
+
+        tn_fw = tnos.TNFirewall.get(context, id=id)
         if not fw_with_rules['del-router-ids']:
             # no routers to delete on the agent side
             self.delete_db_firewall_object(context, id)
+            if tn_fw is not None:
+                tnos.TNFirewall.delete(context, tn_fw)
         else:
             status = {"firewall": {"status": nl_constants.PENDING_DELETE}}
             super(TNFirewallPlugin, self).update_firewall(context, id, status)
             # Reflect state change in fw_with_rules
             fw_with_rules['status'] = status['firewall']['status']
 
-            tn_fw = tnos.TNFirewall.get(context, id=id)
             try:
                 for router_id in fw_with_rules['del-router-ids']:
                     LOG.debug('router %s', router_id)

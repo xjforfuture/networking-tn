@@ -30,6 +30,8 @@ from neutron.db import l3_db as neu_l3_db
 from neutron.db import models_v2
 from neutron.db import api as db_api
 from neutron_lib import constants as cst
+from neutron_lib.plugins import constants as p_consts
+from neutron_lib.plugins import directory
 
 from networking_tn._i18n import _, _LE
 from networking_tn.common import config
@@ -65,6 +67,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         """Fortinet specific initialization for this class."""
         LOG.debug("TNL3ServicePlugin_init")
         self._tn_info = config.tn_info
+        self.enable_fwaas = 'tn_firewall' in cfg.CONF.service_plugins
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -159,6 +162,10 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         LOG.debug("delete_router: router id=%s", id)
 
         try:
+            if self.enable_fwaas:
+                fw_plugin = directory.get_plugin(p_consts.FIREWALL)
+                fw_plugin.update_firewall_for_delete_router(context, id)
+
             self._update_tn_router_route(context, id, del_all=True)
             self._remove_tn_router_interface(context, id, is_gw=True)
 
