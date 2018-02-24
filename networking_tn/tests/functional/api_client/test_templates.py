@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet, Inc.
+# Copyright 2018 Tsinghuanet, Inc.
 # All Rights Reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -28,7 +28,7 @@ class ClientTestCase(unittest2.TestCase):
         super(ClientTestCase, self).setUp()
         fgtip = '10.160.37.96' if not fgtip else fgtip
         api_server = [(fgtip, port, 'https' == protocol)]
-        self.client = client.FortiosApiClient(api_server, username, password)
+        self.client = client.TnosApiClient(api_server, username, password)
         self.vdom = 'root'
 
     def tearDown(self):

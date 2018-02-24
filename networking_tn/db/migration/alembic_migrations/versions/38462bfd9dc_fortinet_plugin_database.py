@@ -1,4 +1,4 @@
-# Copyright 2015 OpenStack Foundation
+# Copyright 2018 OpenStack Foundation
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -17,7 +17,7 @@
 
 Revision ID: 38462bfd9dc
 Revises: None
-Create Date: 2015-12-01 14:26:02.305436
+Create Date: 2018-01-01 14:26:02.305436
 
 """
 
@@ -37,6 +37,7 @@ def downgrade():
     op.drop_table('tn_vms')
     op.drop_table('tn_addresss')
     op.drop_table('tn_services')
+    op.drop_table('tn_snat_rules')
     op.drop_table('tn_rules')
     op.drop_table('tn_policys')
     op.drop_table('tn_firewalls')

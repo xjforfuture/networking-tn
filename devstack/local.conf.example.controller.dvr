@@ -7,8 +7,8 @@ disable_service tempest
 enable_service q-svc q-fwaas n-novnc
 
 # CHANGEME: customized git repo location
-enable_plugin networking-fortinet file:///home/stack/networking-fortinet master
-#enable_plugin networking-fortinet https://git.openstack.org/openstack/networking-fortinet master
+enable_plugin networking-tsinghuanet file:///home/stack/networking-tsinghuanet master
+#enable_plugin networking-tsinghuanet https://git.openstack.org/openstack/networking-tsinghuanet master
 
 # CHANGEME: vlan range for tenant networks
 Q_ML2_PLUGIN_VLAN_TYPE_OPTIONS='network_vlan_ranges=physnet1:1009:1099'
@@ -20,12 +20,12 @@ Q_FLOATING_ALLOCATION_POOL=start=10.160.38.241,end=10.160.38.250
 FLOATING_RANGE=10.160.38.1/24
 PUBLIC_NETWORK_GATEWAY=10.160.38.1
 
-# CHANGEME: if q-fwaas is enabled and fortigate is used as firewall.
+# CHANGEME: if q-fwaas is enabled and tsinghuanet is used as firewall.
 enable_plugin neutron-fwaas https://git.openstack.org/openstack/neutron-fwaas master
 FWAAS_PLUGIN=fwaas_fortinet
 
-# fortigate ml2 plugin parameters
-# CHANGEME: ip address of the fortigate rest API
+# tsinghuanet ml2 plugin parameters
+# CHANGEME: ip address of the tsinghuanet rest API
 Q_FORTINET_PLUGIN_FG_IP=10.160.2.230
 # CHANGEME: interface for tenant traffic
 Q_FORTINET_PLUGIN_FG_INT_INF=port2
@@ -33,15 +33,15 @@ Q_FORTINET_PLUGIN_FG_INT_INF=port2
 Q_FORTINET_PLUGIN_FG_EXT_INF=port3
 # CHANGEME: if use fortivm set to False, True if hardware npu available
 Q_FORTINET_PLUGIN_NPU_AVAILABLE=False
-# CHANGEME: fortigate username
+# CHANGEME: tsinghuanet username
 Q_FORTINET_PLUGIN_FG_USERNAME=admin
-# CHANGEME: fortigate password
+# CHANGEME: tsinghuanet password
 Q_FORTINET_PLUGIN_FG_PASSWORD=''
-# following 5 parameters enable fortigate firewall policy security profiles on
+# following 5 parameters enable tsinghuanet firewall policy security profiles on
 # fwaas.
 # CHANGEME: leave empty to disable the security profile or change to something
 # else other than default, but you have to define them first in the specific
-# vdom on fortigate if you know what you are doing.
+# vdom on tsinghuanet if you know what you are doing.
 Q_FORTINET_FWAAS_AV_PROFILE=default
 Q_FORTINET_FWAAS_WEBFILTER_PROFILE=default
 Q_FORTINET_FWAAS_IPS_SENSOR=default

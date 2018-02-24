@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet, Inc.
+# Copyright 2018 Tsinghuanet, Inc.
 # All Rights Reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -38,7 +38,7 @@ class TestTasks(unittest2.TestCase):
         is a example format of subtask:
         'subtask':
                 {'params': (
-                    <fortiosclient.client.FortiosApiClient object at 0x**>,
+                    <fortiosclient.client.TnosApiClient object at 0x**>,
                     {'id': 2, 'vdom': 'root'}
                 ),
                 'func': <function wrapper at 0x2b62ed8>
@@ -59,7 +59,7 @@ class TestTasks(unittest2.TestCase):
         is a example format of subtask:
         'subtask':
                 {'params': (
-                    <fortiosclient.client.FortiosApiClient object at 0x**>,
+                    <fortiosclient.client.TnosApiClient object at 0x**>,
                     {'id': 2, 'vdom': 'root'}
                 ),
                 'func': <function wrapper at 0x2b62ed8>

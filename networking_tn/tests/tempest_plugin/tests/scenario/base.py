@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Midokura SARL
+# Copyright (c) 2018 Midokura SARL
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -108,7 +108,7 @@ class FWaaSScenarioTest(fwaas_client.FWaaSClientMixin,
             body = client.show_router(router_id)
             return body['router']
         elif network_id:
-            # fortigate plugin only allow one router per tenant, so if
+            # tsinghuanet plugin only allow one router per tenant, so if
             # a router already exists, use it.
             routers_list = client.list_routers(tenant_id=tenant_id)
             if len(routers_list['routers']) == 1:
@@ -123,7 +123,7 @@ class FWaaSScenarioTest(fwaas_client.FWaaSClientMixin,
                             "'public_network_id' has been defined.")
 
     def _default_allow(self):
-        if CONF.fortigate.enable_default_fwrule:
+        if CONF.tsinghuanet.enable_default_fwrule:
             return False
         else:
             return True

@@ -1,4 +1,4 @@
-Welcome to networking-fortigate's documentation!
+Welcome to networking-tsinghuanet's documentation!
 ========================================================
 
 Contents:

@@ -14,7 +14,7 @@
 
 import oslo_i18n
 
-DOMAIN = "networking-fortinet"
+DOMAIN = "networking-tsinghuanet"
 
 _translators = oslo_i18n.TranslatorFactory(domain=DOMAIN)
 

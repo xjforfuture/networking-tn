@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet, Inc.
+# Copyright 2018 Tsinghuanet, Inc.
 #
 # All Rights Reserved
 #
@@ -137,10 +137,10 @@ class EventletApiRequest(request.ApiRequest):
             if isinstance(req, httplib.HTTPResponse):
                 timeout = 0
                 if attempt <= self._retries and not self._abort:
-                    # currently there is a bug in fortios, it return 401 and
+                    # currently there is a bug in TnOS, it return 401 and
                     # 400 when a cookie is invalid, the change is to tolerant
                     # the bug to handle return 400 situation.
-                    # when fortios fix the bug, here should use
+                    # when TnOS fix the bug, here should use
                     # 'req.status in (401, 403)' instead
                     if req.status in (400, 401, 403):
                         continue

@@ -163,7 +163,7 @@ class TNSnatRule(object):
 
     @staticmethod
     def add_apply(context, client, rule):
-        LOG.debug('trace')
+        LOG.debug('rule add_apply')
         TNL3Address.add_apply(context, client, rule.router_id, rule.srcaddr_name)
         TNL3Address.add_apply(context, client, rule.router_id, rule.dstaddr_name)
         TNL3Address.add_apply(context, client, rule.router_id, rule.trans_addr_name)
@@ -173,7 +173,7 @@ class TNSnatRule(object):
 
     @staticmethod
     def del_apply(context, client, rule):
-        LOG.debug('trace')
+        LOG.debug('rule del_apply')
         client.request(templates.DEL_SNAT_RULE, id=rule.inner_id, trans=rule.trans,
                        saddr=rule.srcaddr_name, daddr= rule.dstaddr_name, trans_addr=rule.trans_addr_name)
 

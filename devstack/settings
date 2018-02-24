@@ -1,6 +1,6 @@
 Q_PLUGIN=ml2
 IP_VERSION=4
-Q_ML2_PLUGIN_MECHANISM_DRIVERS=fortinet,openvswitch
+Q_ML2_PLUGIN_MECHANISM_DRIVERS=tsinghuanet,openvswitch
 ML2_L3_PLUGIN=router_fortinet
 Q_ML2_PLUGIN_TYPE_DRIVERS=local,flat,vlan,gre,vxlan
 ENABLE_TENANT_VLANS=True
@@ -11,4 +11,4 @@ Q_USE_SECGROUP=False
 FORCE_CONFIG_DRIVE=True
 PROVIDER_NETWORK_TYPE=vlan
 PHYSICAL_NETWORK=physnet1
-enable_service fortinet-neutron
+enable_service tsinghuanet-neutron

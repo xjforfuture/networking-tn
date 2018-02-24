@@ -24,7 +24,7 @@
   <devices>
     <disk type="file" device="disk">
       <driver name="qemu" type="qcow2" cache="none"/>
-      <source file="/var/lib/libvirt/images/fortios.qcow2"/>
+      <source file="/var/lib/libvirt/images/TnOS.qcow2"/>
       <target bus="virtio" dev="vda"/>
     </disk>
     <disk type="file" device="cdrom">

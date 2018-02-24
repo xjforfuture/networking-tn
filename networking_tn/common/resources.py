@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet Inc.
+# Copyright 2018 Tsinghuanet Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -22,13 +22,8 @@ import sys
 import types
 
 from networking_tn._i18n import _LE
-from networking_tn.common import constants as const
-
 
 LOG = logging.getLogger(__name__)
-
-OPS = ["ADD", "DELETE", "SET", "GET", "MOVE"]
-RB_FUNC = {'add': 'delete'}
 
 
 # For debug purpose
@@ -43,17 +38,6 @@ def funcinfo(cls=None, action=None, data=None):
                   {'cls': cls.__name__, 'action': action, 'data': data})
 
 
-def rollback(func):
-    def wrapper(cls, *args):
-        result = func(cls, *args)
-        if not result:
-            rollback = {}
-        else:
-            rollback = cls._prepare_rollback(cls.delete, *args, **result)
-        return {'result': result, 'rollback': rollback}
-    return wrapper
-
-
 class Exinfo(object):
     def __init__(self, exception):
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -64,172 +48,3 @@ class Exinfo(object):
                    'args': exception.args,
                    'line': exc_tb.tb_lineno,
                    'file': fname})
-
-
-class DefaultClassMethods(type):
-    def __getattr__(cls, attr):
-        if str(attr).upper() not in OPS:
-            raise AttributeError(attr)
-        if 'ADD' == str(attr).upper():
-            @rollback
-            def _defaultClassMethod(cls, client, data):
-                return cls.element(client, attr, data)
-        else:
-            def _defaultClassMethod(cls, client, data):
-                return cls.element(client, attr, data)
-        return types.MethodType(_defaultClassMethod, cls)
-
-
-@six.add_metaclass(DefaultClassMethods)
-class Base(object):
-    def __init__(self):
-        self.exist = False
-        self.rollback = None
-
-    @staticmethod
-    def params_decoded(*args):
-        keys = ['client', 'data']
-        return dict(zip(keys, args))
-
-    @classmethod
-    def _prepare_rollback(cls, func, *args, **result):
-        if not func:
-            return None
-        params = cls.params_decoded(*args)
-        data = cls._rollback_data(params, **result)
-        rollback = {
-            'func': func,
-            'params': (params['client'], data)
-        }
-        return rollback
-
-    @classmethod
-    def _rollback_data(cls, params, **result):
-        return {
-            'vdom': params['data'].get('vdom', const.EXT_VDOM),
-            'name': params['data']['name']
-        }
-
-    @classmethod
-    def element(cls, client, action, data):
-        funcinfo(cls=cls, action=action, data=data)
-        if not data:
-            data = getattr(cls, 'data', None)
-        # op is the combination of action and resource class name,
-        # all ops should be defined in the templates
-        name = re.findall("[A-Z][^A-Z]*", cls.__name__)
-        op = "%s_%s" % (str(action).upper(), "_".join(name).upper())
-        LOG.debug('***request: %s' % op)
-        try:
-            return client.request(op, **data)
-        except api_ex.ApiException as e:
-            Exinfo(e)
-            raise e
-
-
-class Vdom(Base):
-    def __init__(self):
-        super(Vdom, self).__init__()
-
-    @classmethod
-    def _rollback_data(cls, params, **result):
-        return {'name': params['data'].get('name')}
-
-
-class VdomLink(Base):
-    def __init__(self):
-        super(VdomLink, self).__init__()
-
-
-class VlanInterface(Base):
-    def __init__(self):
-        super(VlanInterface, self).__init__()
-
-"""
-    @classmethod
-    def get_with_params_check(cls, driver, data):
-        res = cls.get(driver, data)
-        for key, value in data.iteritems():
-            if value != res['results'][0].get(key):
-                res = cls.set(driver, data)
-                break
-        return res
-"""
-
-
-class RouterStatic(Base):
-    def __init__(self):
-        super(RouterStatic, self).__init__()
-
-    @classmethod
-    def _rollback_data(cls, params, **result):
-        if result.get('results'):
-            mkey = result['results']['mkey']
-        else:
-            mkey = result['mkey']
-        return {
-            'vdom': params['data']['vdom'],
-            'id': mkey
-        }
-
-
-class FirewallIppool(Base):
-    def __init__(self):
-        super(FirewallIppool, self).__init__()
-
-
-class FirewallPolicy(Base):
-    def __init__(self):
-        super(FirewallPolicy, self).__init__()
-
-    @classmethod
-    def _rollback_data(cls, params, **result):
-        if result.get('results'):
-            mkey = result['results']['mkey']
-        else:
-            mkey = result['mkey']
-        return {
-            'vdom': params['data']['vdom'],
-            'id': mkey
-        }
-
-
-class FirewallAddress(Base):
-    def __init__(self):
-        super(FirewallAddress, self).__init__()
-
-
-class FirewallAddrgrp(Base):
-    def __init__(self):
-        super(FirewallAddrgrp, self).__init__()
-
-
-class FirewallService(Base):
-    def __init__(self):
-        super(FirewallService, self).__init__()
-
-
-class DhcpServer(Base):
-    def __init__(self):
-        super(DhcpServer, self).__init__()
-
-    @classmethod
-    def _rollback_data(cls, params, **result):
-        if result.get('results'):
-            mkey = result['results']['mkey']
-        else:
-            mkey = result['mkey']
-        return {
-            'vdom': params['data']['vdom'],
-            'id': mkey
-        }
-
-
-class DhcpServerRsvAddr(Base):
-    def __init__(self):
-        super(DhcpServerRsvAddr, self).__init__()
-
-
-class FirewallVip(Base):
-    def __init__(self):
-        super(FirewallVip, self).__init__()

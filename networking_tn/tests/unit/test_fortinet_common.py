@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Fortinet Inc.
+# Copyright (c) 2018 Tsinghuanet Inc.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -43,7 +43,7 @@ TEST_ROUTER = 'router_id'
 
 class ConfigMixin(object):
 
-    """Mock the config for Fortinet driver and service unit tests."""
+    """Mock the config for Tsinghuanet driver and service unit tests."""
 
     def __init__(self):
         self.mocked_parser = None
@@ -54,7 +54,7 @@ class ConfigMixin(object):
 
         # Configure the ML2 mechanism drivers and network types
         ml2_opts = {
-            'mechanism_drivers': ['fortinet', 'openvswitch'],
+            'mechanism_drivers': ['tsinghuanet', 'openvswitch'],
             'tenant_network_types': ['vlan'],
         }
         for opt, val in ml2_opts.items():
@@ -74,7 +74,7 @@ class ConfigMixin(object):
                               'ml2_type_vlan')
         self.vlan_ranges = ml2_type_vlan_opts['vlan_ranges']
 
-        # Configure the Fortinet mechanism driver
+        # Configure the Tsinghuanet mechanism driver
         fgt_test_config = {
             'address': FGT_HOST,
             'username': FGT_USR,

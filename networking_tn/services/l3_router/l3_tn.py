@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet Inc.
+# Copyright 2018 Tsinghuanet Inc.
 # All rights reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -15,13 +15,14 @@
 #
 
 
-"""Implentation of FortiOS service Plugin."""
+"""Implentation of TnOS service Plugin."""
 
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import excutils
 
 from neutron_lib import constants as l3_constants
+from neutron_lib.plugins import constants as plugin_constants
 
 from neutron.db.models import l3 as l3_db
 from neutron.plugins.ml2 import db
@@ -55,7 +56,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
     supported_extension_aliases = ["router", "ext-gw-mode", "extraroute"]
 
     def __init__(self):
-        """Initialize Fortinet L3 service Plugin."""
+        """Initialize Tsinghuanet L3 service Plugin."""
         super(TNL3ServicePlugin, self).__init__()
         self._tn_info = None
         # self._driver = None
@@ -64,7 +65,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         self.tn_init()
 
     def tn_init(self):
-        """Fortinet specific initialization for this class."""
+        """Tsinghuanet specific initialization for this class."""
         LOG.debug("TNL3ServicePlugin_init")
         self._tn_info = config.tn_info
         self.enable_fwaas = 'tn_firewall' in cfg.CONF.service_plugins
@@ -95,6 +96,49 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             resources.Exinfo(e)
 
         return rlt
+
+    '''
+    @db_api.retry_if_session_inactive()
+    def update_router(self, context, id, router):
+        LOG.debug("update_router: id=%(id)s, router=%(router)s",
+                  {'id': id, 'router': router})
+
+        r = router['router']
+        gw_info = r.pop(neu_l3_db.EXTERNAL_GW_INFO, l3_constants.ATTR_NOT_SPECIFIED)
+        original = self.get_router(context, id)
+        # check whether router needs and can be rescheduled to the proper
+        # l3 agent (associated with given external network);
+        # do check before update in DB as an exception will be raised
+        # in case no proper l3 agent found
+        if gw_info != l3_constants.ATTR_NOT_SPECIFIED:
+            candidates = self._check_router_needs_rescheduling(
+                context, id, gw_info)
+            # Update the gateway outside of the DB update since it involves L2
+            # calls that don't make sense to rollback and may cause deadlocks
+            # in a transaction.
+            self._update_router_gw_info(context, id, gw_info)
+        else:
+            candidates = None
+        router_db = self._update_router_db(context, id, r)
+        if candidates:
+            l3_plugin = directory.get_plugin(plugin_constants.L3)
+            l3_plugin.reschedule_router(context, id, candidates)
+        updated = self._make_router_dict(router_db)
+
+        registry.notify(resources.ROUTER, events.AFTER_UPDATE, self,
+                        context=context, router_id=id, old_router=original,
+                        router=updated, request_attrs=r, router_db=router_db)
+
+        gateway = router['router'].get('external_gateway_info')
+        if gateway is not None:
+            self._update_tn_router_gw(context, id, gateway, updated)
+
+        routes = router['router'].get('routes')
+        if routes is not None:
+            self._update_tn_router_route(context, id, routes)
+
+        return updated
+    '''
 
     def update_router(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
@@ -264,7 +308,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
 
     def remove_router_interface(self, context, router_id, interface_info):
-        """Deletes vlink, default router from Fortinet device."""
+        """Deletes vlink, default router from Tsinghuanet device."""
         LOG.debug("TNL3ServicePlugin.remove_router_interface called: "
                   "router_id=%(router_id)s "
                   "interface_info=%(interface_info)r",

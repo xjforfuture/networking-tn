@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet Inc.
+# Copyright 2018 Tsinghuanet Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -93,12 +93,12 @@ tn_info = {
 
 
 def get_apiclient(address=None):
-    """Fortinet api client initialization."""
+    """Tsinghuanet api client initialization."""
     #api_server = [(address if address else tn_info['address'], tn_info['port'],
     #              'https' == tn_info['protocol'])]
 
     api_server = [(address if address else tn_info['address'], tn_info['port'],
                    'https' == tn_info['protocol'])]
 
-    return client.FortiosApiClient(api_server, tn_info['username'], tn_info['password'])
+    return client.TnosApiClient(api_server, tn_info['username'], tn_info['password'])
 

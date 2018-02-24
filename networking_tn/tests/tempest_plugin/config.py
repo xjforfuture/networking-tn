@@ -1,4 +1,4 @@
-# Copyright (c) 2016 Fortinet Inc.
+# Copyright (c) 2016 Tsinghuanet Inc.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -25,4 +25,4 @@ FORTIGATE = [
 
 
 def register_opts():
-    cfg.CONF.register_opts(FORTIGATE, "fortigate")
+    cfg.CONF.register_opts(FORTIGATE, "tsinghuanet")

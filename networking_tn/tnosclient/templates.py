@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Fortinet, Inc.
+# Copyright (c) 2018 Tsinghuanet, Inc.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-#    FortiOS API request format templates.
+#    TnOS API request format templates.
 
 # About api request message naming regulations:
 # Prefix         HTTP method

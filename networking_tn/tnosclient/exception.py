@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet, Inc.
+# Copyright 2018 Tsinghuanet, Inc.
 #
 # All Rights Reserved
 #
@@ -20,7 +20,7 @@ from networking_tn.tnosclient._i18n import _
 
 
 class ApiException(Exception):
-    """Base FortiOS API Client Exception.
+    """Base TnOS API Client Exception.
 
     To correctly use this class, inherit from it and define
     a 'message' property. That message will get printf'd

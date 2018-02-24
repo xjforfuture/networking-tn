@@ -248,7 +248,7 @@ class FortigateFWaaSExtensionTestJSON(base.BaseFWaaSTest):
         # Delete firewall
         self.firewalls_client.delete_firewall(firewall_id)
 
-    # fortigate plugin only allow one router per tenant
+    # tsinghuanet plugin only allow one router per tenant
     @decorators.idempotent_id('4ea48c81-27c2-49fd-8c8f-bb617dc0755c')
     def test_firewall_insertion_mode_add_remove_router(self):
         # Create router

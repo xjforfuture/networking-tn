@@ -1,4 +1,4 @@
-# Copyright 2015 Fortinet, Inc.
+# Copyright 2018 Tsinghuanet, Inc.
 #
 # All Rights Reserved
 #
@@ -37,7 +37,7 @@ LOG = logging.getLogger(__name__)
 
 
 class EventletApiClient(base.ApiClientBase):
-    """Eventlet-based implementation of FortiOS ApiClient ABC."""
+    """Eventlet-based implementation of TnOS ApiClient ABC."""
 
     def __init__(self, api_providers, user, password,
                  concurrent_connections=csts.DEFAULT_CONCURRENT_CONNECTIONS,

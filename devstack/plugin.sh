@@ -13,7 +13,7 @@
 #    under the License.
 
 # devstack/plugin.sh
-# Functions to control the configuration of fortigate ml2 plugin
+# Functions to control the configuration of tsinghuanet ml2 plugin
 
 # Dependencies:
 #
@@ -63,7 +63,7 @@ Q_FORTINET_FWAAS_ENABLE_DEFAULT_FWRULE=${Q_FORTINET_FWAAS_ENABLE_DEFAULT_FWRULE:
 PING_TIMEOUT=${PING_TIMEOUT:-300}
 
 # The project directory
-NETWORKING_FGT_DIR=$DEST/networking-fortinet
+NETWORKING_FGT_DIR=$DEST/networking-tsinghuanet
 
 # create a nat network for the fgtvm management plane in DVR mode.
 FGT_BR=fgt-br
@@ -84,7 +84,7 @@ source $TOP_DIR/lib/neutron_plugins/ml2
 
 function install_fortigate_neutron_ml2_driver {
     cd $NETWORKING_FGT_DIR
-    echo "Installing the networking-fortinet driver for Fortigate"
+    echo "Installing the networking-tsinghuanet driver for Tsinghuanet"
     sudo pip install -c $REQUIREMENTS_DIR/upper-constraints.txt -e .
     # use the latest fortiosclient for test purpose
     sudo pip install -c $REQUIREMENTS_DIR/upper-constraints.txt -r https://raw.githubusercontent.com/jerryz1982/fortiosclient/master/requirements.txt
@@ -92,7 +92,7 @@ function install_fortigate_neutron_ml2_driver {
 }
 
 function configure_fortigate_neutron_ml2_driver {
-    # populate the fortinet plugin cfg file with the FG information
+    # populate the tsinghuanet plugin cfg file with the FG information
     iniset /$Q_PLUGIN_CONF_FILE ml2_fortinet address $Q_FORTINET_PLUGIN_FG_IP
     iniset /$Q_PLUGIN_CONF_FILE ml2_fortinet port $Q_FORTINET_PLUGIN_FG_PORT
     iniset /$Q_PLUGIN_CONF_FILE ml2_fortinet \
@@ -141,7 +141,7 @@ function configure_tempest_for_fortigate_plugin {
     # sometimes it can take 3 dhcp discover attempts for vm
     # to get an ip address in our ci system.
     iniset /$TEMPEST_CONFIG validation ping_timeout $PING_TIMEOUT
-    iniset /$TEMPEST_CONFIG fortigate enable_default_fwrule $Q_FORTINET_FWAAS_ENABLE_DEFAULT_FWRULE
+    iniset /$TEMPEST_CONFIG tsinghuanet enable_default_fwrule $Q_FORTINET_FWAAS_ENABLE_DEFAULT_FWRULE
 }
 
 function has_neutron_plugin_security_group {
@@ -191,7 +191,7 @@ EOF
         genisoimage -output $TOP_DIR/disk.config -ldots -allow-lowercase \
 -allow-multidot -l -volid cidata -joliet -rock -V config-2 $NETWORKING_FGT_DIR/devstack/cloud_init
         # update the VM data
-        yes | sudo wget $Q_FORTINET_IMAGE_URL -O $IMG_DIR/fortios.qcow2
+        yes | sudo wget $Q_FORTINET_IMAGE_URL -O $IMG_DIR/TnOS.qcow2
         yes | sudo cp $TOP_DIR/disk.config $IMG_DIR/disk.config
 
         # create VM with the updated data
@@ -237,7 +237,7 @@ function clean_builtin_fortivm {
 }
 
 
-if is_service_enabled fortinet-neutron; then
+if is_service_enabled tsinghuanet-neutron; then
     if [[ "$1" == "source" ]]; then
         # no-op
         :

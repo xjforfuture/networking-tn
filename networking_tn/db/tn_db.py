@@ -22,9 +22,6 @@ from oslo_db import exception as os_db_exception
 import six
 import sqlalchemy as sa
 from sqlalchemy.inspection import inspect
-from sqlalchemy import orm
-
-from networking_tn.common import constants as const
 
 
 OPS = ["ADD", "UPDATE", "DELETE", "QUERY"]

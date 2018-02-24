@@ -28,7 +28,7 @@ except Exception:
 
 from networking_tn.tnosclient._i18n import _LE, _LW
 from networking_tn.tnosclient.common import constants as csts
-from networking_tn.tnosclient.common import singleton
+# from networking_tn.tnosclient.common import singleton
 from networking_tn.tnosclient import eventlet_client
 from networking_tn.tnosclient import eventlet_request
 from networking_tn.tnosclient import exception
@@ -38,8 +38,8 @@ LOG = logging.getLogger(__name__)
 
 
 #@singleton.singleton
-class FortiosApiClient(eventlet_client.EventletApiClient):
-    """The FortiOS API Client."""
+class TnosApiClient(eventlet_client.EventletApiClient):
+    """The TnOS API Client."""
 
     def __init__(self, api_providers, user, password,
                  concurrent_connections=csts.DEFAULT_CONCURRENT_CONNECTIONS,
@@ -58,7 +58,7 @@ class FortiosApiClient(eventlet_client.EventletApiClient):
         :param retries: the number of http/https request to retry.
         :param redirects: the number of concurrent connections.
         '''
-        super(FortiosApiClient, self).__init__(
+        super(TnosApiClient, self).__init__(
             api_providers, user, password,
             concurrent_connections=concurrent_connections,
             gen_timeout=gen_timeout, use_https=use_https,

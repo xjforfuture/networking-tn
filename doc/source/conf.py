@@ -37,8 +37,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'networking-fortinet'
-copyright = u'2015, OpenStack Foundation'
+project = u'networking-tsinghuanet'
+copyright = u'2018, OpenStack Foundation'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = True

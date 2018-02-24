@@ -6,7 +6,7 @@ from oslo_log import log as logging
 from networking_tn._i18n import _, _LE
 
 from networking_tn.tnosclient import tnos_driver as tn_drv
-from networking_tn.tnosclient import ovs_cb as ovsctl
+from networking_tn.ovsctl import ovsctl
 from networking_tn.common import config
 from networking_tn.tnosclient import templates
 from networking_tn.db import tn_db
@@ -166,10 +166,6 @@ def add_intf(context, router_id, port, is_gw):
     if port_name is None:
         return None
 
-    cmd = 'sudo ip netns exec qrouter-'+router_id+' ifconfig '+port_name+' down'
-    subprocess.Popen(cmd, shell=True)
-    # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
-
     router = get_tn_router(context, router_id)
     if is_gw:
         extern_name = get_extern_intf_name(GW_INTF, router.priv_id)
@@ -200,6 +196,13 @@ def add_intf(context, router_id, port, is_gw):
         intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
                                 extern_name=extern_name, inner_name=sub_inner_name, state='up',
                                 vlan_id=tag, is_gw='False', is_sub='True')
+
+    cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' 0.0.0.0'
+    subprocess.Popen(cmd, shell=True)
+
+    cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' down'
+    subprocess.Popen(cmd, shell=True)
+    # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
 
     cmd = 'sudo ifconfig %s up \n' % intf.extern_name
     subprocess.Popen(cmd, shell=True)
