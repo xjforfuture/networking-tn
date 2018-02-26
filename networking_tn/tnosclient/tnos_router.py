@@ -54,6 +54,15 @@ def wait_for_ovs(context, port):
     return (None, None)
     #raise Exception(_("add router interface to ovs fail!"))
 
+def shutdown_old_intf(router_id, port_id, is_gw):
+    if is_gw:
+        port_name = 'qg-'+port_id[:11]
+    else:
+        port_name = 'qr-' + port_id[:11]
+    cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' down'
+    subprocess.Popen(cmd, shell=True)
+    # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
+
 
 def get_extern_intf_name(intf_num, router_priv_id):
     return EXTERN_INTF_NAME % {'num': str(intf_num), 'router_priv_id': router_priv_id}
@@ -197,12 +206,7 @@ def add_intf(context, router_id, port, is_gw):
                                 extern_name=extern_name, inner_name=sub_inner_name, state='up',
                                 vlan_id=tag, is_gw='False', is_sub='True')
 
-    cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' 0.0.0.0'
-    subprocess.Popen(cmd, shell=True)
-
-    cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' down'
-    subprocess.Popen(cmd, shell=True)
-    # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
+    shutdown_old_intf(router_id, port['id'], is_gw)
 
     cmd = 'sudo ifconfig %s up \n' % intf.extern_name
     subprocess.Popen(cmd, shell=True)

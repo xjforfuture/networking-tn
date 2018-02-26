@@ -23,6 +23,9 @@ from oslo_utils import excutils
 
 from neutron_lib import constants as l3_constants
 from neutron_lib.plugins import constants as plugin_constants
+from neutron_lib.callbacks import registry
+from neutron_lib.callbacks import events
+from neutron_lib.callbacks import resources as rsc
 
 from neutron.db.models import l3 as l3_db
 from neutron.plugins.ml2 import db
@@ -97,12 +100,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         return rlt
 
-    '''
     @db_api.retry_if_session_inactive()
-    def update_router(self, context, id, router):
-        LOG.debug("update_router: id=%(id)s, router=%(router)s",
-                  {'id': id, 'router': router})
-
+    def _update_router(self, context, id, router):
         r = router['router']
         gw_info = r.pop(neu_l3_db.EXTERNAL_GW_INFO, l3_constants.ATTR_NOT_SPECIFIED)
         original = self.get_router(context, id)
@@ -125,9 +124,34 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             l3_plugin.reschedule_router(context, id, candidates)
         updated = self._make_router_dict(router_db)
 
-        registry.notify(resources.ROUTER, events.AFTER_UPDATE, self,
-                        context=context, router_id=id, old_router=original,
-                        router=updated, request_attrs=r, router_db=router_db)
+        routes = r.get('routes')
+        if routes is None:
+            registry.notify(rsc.ROUTER, events.AFTER_UPDATE, self,
+                            context=context, router_id=id, old_router=original,
+                            router=updated, request_attrs=r, router_db=router_db)
+
+            self.notify_router_updated(context, updated['id'], None)
+
+        return updated
+
+
+    def update_router(self, context, id, router):
+        LOG.debug("update_router: id=%(id)s, router=%(router)s",
+                  {'id': id, 'router': router})
+
+        r = router['router']
+        if 'routes' in r:
+            with context.session.begin(subtransactions=True):
+                # check if route exists and have permission to access
+                router_db = self._get_router(context, id)
+                self._update_extra_routes(context, router_db, r['routes'])
+            # NOTE(yamamoto): expire to ensure the following update_router
+            # see the effects of the above _update_extra_routes.
+            context.session.expire(router_db, attribute_names=['route_list'])
+
+        updated =  self._update_router(context, id, router)
+
+        LOG.debug(updated)
 
         gateway = router['router'].get('external_gateway_info')
         if gateway is not None:
@@ -138,9 +162,9 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             self._update_tn_router_route(context, id, routes)
 
         return updated
-    '''
 
-    def update_router(self, context, id, router):
+
+    def update_router_old(self, context, id, router):
         LOG.debug("update_router: id=%(id)s, router=%(router)s",
                   {'id': id, 'router': router})
 
@@ -236,6 +260,12 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         info = super(TNL3ServicePlugin, self).add_router_interface(
             context, router_id, interface_info)
+
+        # todo xiongjun: patch, fix bug: namespace interface will be up when add interface
+        router = self._get_router(context, router_id)
+        LOG.debug(router.gw_port)
+        if router.gw_port is not None:
+            tnos_router.shutdown_old_intf(router_id, router.gw_port['id'], True)
 
         port = db.get_port(context, info['port_id'])
         port['admin_state_up'] = True
