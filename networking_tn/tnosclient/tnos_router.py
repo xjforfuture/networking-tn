@@ -54,13 +54,17 @@ def wait_for_ovs(context, port):
     return (None, None)
     #raise Exception(_("add router interface to ovs fail!"))
 
-def shutdown_old_intf(router_id, port_id, is_gw):
-    if is_gw:
-        port_name = 'qg-'+port_id[:11]
-    else:
-        port_name = 'qr-' + port_id[:11]
-    cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' down'
-    subprocess.Popen(cmd, shell=True)
+def shutdown_old_intf(context, router_id):
+
+    intfs = tn_db.query_records(context, tn_db.Tn_Interface, router_id=router_id)
+
+    for intf in intfs:
+        if intf.is_gw:
+            port_name = 'qg-'+intf.id[:11]
+        else:
+            port_name = 'qr-'+intf.id[:11]
+        cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' down'
+        subprocess.Popen(cmd, shell=True)
     # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
 
 
@@ -206,7 +210,8 @@ def add_intf(context, router_id, port, is_gw):
                                 extern_name=extern_name, inner_name=sub_inner_name, state='up',
                                 vlan_id=tag, is_gw='False', is_sub='True')
 
-    shutdown_old_intf(router_id, port['id'], is_gw)
+    # todo xiongjun: patch, fix bug: namespace interface will be up when add interfaces
+    shutdown_old_intf(context, router_id)
 
     cmd = 'sudo ifconfig %s up \n' % intf.extern_name
     subprocess.Popen(cmd, shell=True)
@@ -233,6 +238,9 @@ def del_intf(context, router_id, intf_id):
                 ovsctl.del_port(context, INT_BRIDGE_NAME, intf.extern_name)
 
         tn_db.delete_record(context, tn_db.Tn_Interface, id=intf.id)
+
+        # todo xiongjun: patch, fix bug: namespace interface will be up when add interface
+        shutdown_old_intf(context, router_id)
 
 
 def get_intf(context, **kwargs):

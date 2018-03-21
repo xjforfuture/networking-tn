@@ -100,6 +100,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         return rlt
 
+
     @db_api.retry_if_session_inactive()
     def _update_router(self, context, id, router):
         r = router['router']
@@ -179,6 +180,8 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         routes = router['router'].get('routes')
         if routes is not None:
             self._update_tn_router_route(context, id, routes)
+            # todo xiongjun: patch, fix bug: namespace interface will be up when update router
+            tnos_router.shutdown_old_intf(context, id)
 
         return updated
 
@@ -261,12 +264,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         info = super(TNL3ServicePlugin, self).add_router_interface(
             context, router_id, interface_info)
 
-        # todo xiongjun: patch, fix bug: namespace interface will be up when add interface
-        router = self._get_router(context, router_id)
-        LOG.debug(router.gw_port)
-        if router.gw_port is not None:
-            tnos_router.shutdown_old_intf(router_id, router.gw_port['id'], True)
-
         port = db.get_port(context, info['port_id'])
         port['admin_state_up'] = True
         port['port'] = port
@@ -278,7 +275,6 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         interface_info = info
         subnet = self._core_plugin._get_subnet(context, interface_info['subnet_id'])
         network_id = subnet['network_id']
-        tenant_id = port['tenant_id']
         port_filters = {'network_id': [network_id],
                         'device_owner': [DEVICE_OWNER_ROUTER_INTF]}
         port_count = self._core_plugin.get_ports_count(context,
