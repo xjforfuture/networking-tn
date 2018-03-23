@@ -65,9 +65,11 @@ In this scenario, Tsinghuanet pluggin will be installed on a setup which has alr
 
 On the controller node:
 
-1. pip install git+git://git.openstack.org/openstack/networking-tn
+1. Get networking-tn
 
-2. The following modifications are needed in:
+2. cd networking-tn and install plugin: pip install .
+
+3. The following modifications are needed in:
 
   ::
 
@@ -88,7 +90,7 @@ On the controller node:
 
 4. neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head
 
-5. restart neutron server service. service neutron-server restart or systemctl restart neutron-server
+5. restart neutron server service: service devstack@q-* restart
 
 6. If you don't have existing configuration, you are done here, but if not, you have existing configuration including networks, subnets, routers, ports and VMs based on tenant network of VLAN type and you want to preserve them, run::
 

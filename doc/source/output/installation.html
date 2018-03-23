@@ -115,7 +115,8 @@ Backup the clean configuration of Tsinghuanet to local machine for later restora
 <p>In this scenario, Tsinghuanet pluggin will be installed on a setup which has already OpenStack installed:</p>
 <p>On the controller node:</p>
 <ol class="arabic simple">
-<li>pip install git+git://git.openstack.org/openstack/networking-tn</li>
+<li>Get networking-tn</li>
+<li>cd networking-tn and install plugin: pip install .</li>
 <li>The following modifications are needed in:</li>
 </ol>
 <blockquote>
@@ -139,7 +140,7 @@ Backup the clean configuration of Tsinghuanet to local machine for later restora
 <ol class="arabic" start="4">
 <li><p class="first">neutron-db-manage –config-file /etc/neutron/neutron.conf –config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head</p>
 </li>
-<li><p class="first">restart neutron server service. service neutron-server restart or systemctl restart neutron-server</p>
+<li><p class="first">restart neutron server service: service <a class="reference external" href="mailto:devstack&#37;&#52;&#48;q-*">devstack<span>&#64;</span>q-*</a> restart</p>
 </li>
 <li><p class="first">If you don’t have existing configuration, you are done here, but if not, you have existing configuration including networks, subnets, routers, ports and VMs based on tenant network of VLAN type and you want to preserve them, run:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span>$ tn_migration
@@ -177,7 +178,7 @@ Backup the clean configuration of Tsinghuanet to local machine for later restora
                                   title="next chapter">Contributing</a></p>
             <h3>Project Source</h3>
             <ul class="this-page-menu">
-              <li><a href="http://git.openstack.org/cgit/xjforfuture/networking-tn
+              <li><a href="http://git.openstack.org/cgit/git/networking-tn
 "
                      rel="nofollow">Project Source</a></li>
             </ul>
