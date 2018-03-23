@@ -104,11 +104,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             tnos_router.create_router(context, router_id, tenant_id, router_name,
                                self._tn_info["image_path"], self._tn_info['address'])
 
-            '''
+
             gateway = router['router'].get('external_gateway_info')
             if gateway is not None:
-                self._update_tn_router_gw(context, id, gateway, updated)
-            '''
+                self._update_tn_router_gw(context, id, gateway, rlt)
+
         except Exception as e:
             LOG.error("Failed to create_router router=%(router)s",
                       {"router": router})
