@@ -57,13 +57,14 @@ def wait_for_ovs(context, port):
 def shutdown_old_intf(context, router_id):
 
     intfs = tn_db.query_records(context, tn_db.Tn_Interface, router_id=router_id)
-
+    time.sleep(3)
     for intf in intfs:
-        if intf.is_gw:
+        if intf.is_gw == 'True':
             port_name = 'qg-'+intf.id[:11]
         else:
             port_name = 'qr-'+intf.id[:11]
         cmd = 'sudo ip netns exec qrouter-' + router_id + ' ifconfig ' + port_name + ' down'
+        LOG.debug("excute cmd : %s", cmd)
         subprocess.Popen(cmd, shell=True)
     # ovsctl.del_port(context, INT_BRIDGE_NAME, port_name)
 
@@ -124,6 +125,11 @@ def get_manage_ip(context, manage_ip):
 def get_tn_router(context, router_id):
     return tn_db.query_record(context, tn_db.Tn_Router, id=router_id)
 
+def get_tn_routers(context, **kwargs):
+    return tn_db.query_record(context, tn_db.Tn_Router, **kwargs)
+
+def tn_router_is_exist(router_id):
+    return tn_drv.vm_is_exist(router_id)
 
 def create_router(context, id, tenant_id, name, image_path='tnos.qcow2', manage_ip='90.1.1.1'):
     priv_id = tn_router_id_convert(id)
@@ -180,6 +186,7 @@ def add_intf(context, router_id, port, is_gw):
         return None
 
     router = get_tn_router(context, router_id)
+    intf = get_intf(context, id=port['id'])
     if is_gw:
         extern_name = get_extern_intf_name(GW_INTF, router.priv_id)
         inner_name = get_inner_intf_name(GW_INTF)
@@ -187,9 +194,14 @@ def add_intf(context, router_id, port, is_gw):
         ovsctl.add_port(context, INT_BRIDGE_NAME, extern_name)
         ovsctl.add_access_port_tag(context, extern_name, tag)
 
-        intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
-                                extern_name=extern_name, inner_name=inner_name, state='up',
-                                vlan_id=tag, is_gw='True', is_sub='False')
+        if intf is None:
+            intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
+                                    extern_name=extern_name, inner_name=inner_name, state='up',
+                                    vlan_id=tag, is_gw='True', is_sub='False')
+        else:
+            tn_db.update_record(context, intf, id=port['id'], router_id=router_id,
+                                    extern_name=extern_name, inner_name=inner_name, state='up',
+                                    vlan_id=tag, is_gw='True', is_sub='False')
 
     else:
         # add and get intferface by restful api
@@ -206,9 +218,15 @@ def add_intf(context, router_id, port, is_gw):
         ovsctl.add_trunk_port_tag(context, extern_name, tag)
 
         sub_inner_name = get_inner_intf_name(ROUTER_INTF, tag)
-        intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
-                                extern_name=extern_name, inner_name=sub_inner_name, state='up',
-                                vlan_id=tag, is_gw='False', is_sub='True')
+
+        if intf is None:
+            intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
+                                    extern_name=extern_name, inner_name=sub_inner_name, state='up',
+                                    vlan_id=tag, is_gw='False', is_sub='True')
+        else:
+            tn_db.update_record(context, intf, id=port['id'], router_id=router_id,
+                                    extern_name=extern_name, inner_name=sub_inner_name, state='up',
+                                    vlan_id=tag, is_gw='False', is_sub='True')
 
     # todo xiongjun: patch, fix bug: namespace interface will be up when add interfaces
     shutdown_old_intf(context, router_id)

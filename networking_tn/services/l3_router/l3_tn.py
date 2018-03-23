@@ -72,6 +72,16 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         LOG.debug("TNL3ServicePlugin_init")
         self._tn_info = config.tn_info
         self.enable_fwaas = 'tn_firewall' in cfg.CONF.service_plugins
+        #self.l3_tn_start(context)
+
+    '''
+    def l3_tn_start(self, context):
+        tn_routers = tnos_router.get_tn_routers(context)
+        for router in tn_routers:
+            if tnos_router.tn_router_is_exist(router.id) == False:
+                tnos_router.create_router(context, router.id, router.tenant_id, router.name,
+                                          self._tn_info["image_path"], self._tn_info['address'])
+    '''
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -80,6 +90,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             return
 
         rlt = super(TNL3ServicePlugin, self).create_router(context, router)
+        LOG.debug(rlt)
 
         #with context.session.begin(subtransactions=True):
         tenant_id = router['router']['tenant_id']
@@ -93,6 +104,11 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
             tnos_router.create_router(context, router_id, tenant_id, router_name,
                                self._tn_info["image_path"], self._tn_info['address'])
 
+            '''
+            gateway = router['router'].get('external_gateway_info')
+            if gateway is not None:
+                self._update_tn_router_gw(context, id, gateway, updated)
+            '''
         except Exception as e:
             LOG.error("Failed to create_router router=%(router)s",
                       {"router": router})

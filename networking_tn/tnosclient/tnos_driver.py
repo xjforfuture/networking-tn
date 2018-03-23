@@ -31,6 +31,19 @@ VIRT_STATE_MAP = {'running':'running',
                   'shutdown':'shutdown',
                   'crashed':'crashed'}
 
+def vm_is_exist(id):
+    cmd = 'sudo ps -ef'
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+    proc.wait()
+
+    msg = proc.stdout.read()
+    msgs = msg.split('\n')
+    for msg in msgs:
+        if id in msg:
+            return True
+
+    return False
+
 
 def stop_vm(id):
     try:
@@ -69,7 +82,7 @@ class TNOSvm():
                   + '-device e1000,netdev=eth2 -netdev tap,id=eth2,script=/opt/stack/tnos/nothing '
     '''
 
-    kvm_cmd = 'sudo kvm -nographic -name %(id)s -net tap,ifname=%(tap0)s,script=no -net nic ' \
+    kvm_cmd = 'sudo kvm -cpu Haswell -nographic -name %(id)s -net tap,ifname=%(tap0)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap1)s,script=no -net nic ' \
               +'-net tap,ifname=%(tap2)s,script=no -net nic -m 1G %(image_path)s'
 
