@@ -26,6 +26,7 @@ from neutron.api import extensions as neutron_extensions
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
+from oslo_db.sqlalchemy import session
 
 from neutron_fwaas.common import fwaas_constants as f_const
 from neutron_fwaas.db.firewall import firewall_db
@@ -36,6 +37,13 @@ from networking_tn.db import tn_db
 
 LOG = logging.getLogger(__name__)
 
+class Fake_context(object):
+    def __init__(self):
+        engine = session.EngineFacade.from_config(cfg.CONF)
+        self.session = engine.get_session(autocommit=True,
+                                          expire_on_commit=False)
+
+        self.request_id = 'tn_firewall_init_context'
 
 class FirewallCallbacks(object):
     target = oslo_messaging.Target(version='1.0')
@@ -161,6 +169,10 @@ class TNFirewallPlugin(
         """Do the initialization for the firewall service plugin here."""
         LOG.debug('trace')
         firewall_db.subscribe()
+        context = Fake_context()
+
+        # todo xiongjun
+        #tnos.tn_firewall_start(context)
 
     def start_rpc_listeners(self):
         LOG.debug('trace')

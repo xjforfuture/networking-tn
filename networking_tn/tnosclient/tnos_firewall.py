@@ -383,6 +383,10 @@ class TNFirewall(object):
         return tn_db.query_record(context, tn_db.Tn_Firewall, **kwargs)
 
     @staticmethod
+    def get_list(context, **kwargs):
+        return tn_db.query_records(context, tn_db.Tn_Firewall, **kwargs)
+
+    @staticmethod
     def add_policy(context, fw, policy_id, name=None, desc=None):
         policy = TNPolicy.get(context, id=policy_id)
         if policy is None:
@@ -481,6 +485,23 @@ class TNFirewall(object):
                 TNPolicy.remove_rule_and_apply(context, client, policy, rule_id)
             else:
                 LOG.debug('error')
+
+def tn_firewall_start(context):
+    tn_fws = TNFirewall.get_list(context)
+
+    for fw in tn_fws:
+        if fw.router_ids is not None:
+            router_ids = fw.router_ids.split(',')
+
+            for router_id in router_ids:
+
+                client = tnos.get_tn_client(context, router_id)
+                if client != None:
+                    rules = TNRule.gets(context, policy_id=fw.policy_id)
+                    for rule in rules:
+                        TNRule.add_apply(context, client, rule)
+                else:
+                    LOG.debug('error')
 
 def main_test(context):
 

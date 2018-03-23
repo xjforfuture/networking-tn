@@ -36,6 +36,8 @@ from neutron.db import api as db_api
 from neutron_lib import constants as cst
 from neutron_lib.plugins import constants as p_consts
 from neutron_lib.plugins import directory
+from oslo_db.sqlalchemy import session
+from oslo_config import cfg
 
 from networking_tn._i18n import _, _LE
 from networking_tn.common import config
@@ -51,6 +53,14 @@ DEVICE_OWNER_ROUTER_GW = l3_constants.DEVICE_OWNER_ROUTER_GW
 DEVICE_OWNER_FLOATINGIP = l3_constants.DEVICE_OWNER_FLOATINGIP
 
 LOG = logging.getLogger(__name__)
+
+class Fake_context(object):
+    def __init__(self):
+        engine = session.EngineFacade.from_config(cfg.CONF)
+        self.session = engine.get_session(autocommit=True,
+                                          expire_on_commit=False)
+
+        self.request_id = 'tn_router_init_context'
 
 
 class TNL3ServicePlugin(router.L3RouterPlugin):
@@ -72,16 +82,31 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
         LOG.debug("TNL3ServicePlugin_init")
         self._tn_info = config.tn_info
         self.enable_fwaas = 'tn_firewall' in cfg.CONF.service_plugins
-        #self.l3_tn_start(context)
 
-    '''
-    def l3_tn_start(self, context):
+        # todo xiongjun
+        # self.l3_tn_start()
+
+    def l3_tn_start(self):
+        context = Fake_context()
         tn_routers = tnos_router.get_tn_routers(context)
+        LOG.debug(tn_routers)
         for router in tn_routers:
+            LOG.debug(router)
             if tnos_router.tn_router_is_exist(router.id) == False:
+                LOG.debug("create router")
                 tnos_router.create_router(context, router.id, router.tenant_id, router.name,
-                                          self._tn_info["image_path"], self._tn_info['address'])
-    '''
+                              config.tn_info["image_path"], config.tn_info['address'])
+
+                intfs = tnos_router.get_intfs(context, router_id=router.id)
+                for intf in intfs:
+                    dev_owner = neu_l3_db.DEVICE_OWNER_ROUTER_GW if intf.is_gw == 'True' else DEVICE_OWNER_ROUTER_INTF
+                    port = {'device_owner':dev_owner, 'id':intf.id}
+                    self._add_tn_router_interface(context, router.id, port, intf.ip_prefix)
+
+                routes = tnos_router.get_static_routes(context, router_id=router.id)
+                for route in routes:
+                    tnos_router.add_static_route(context, route.router_id, route.dest, route.prefix, route.next_hop)
+
 
     def create_router(self, context, router):
         LOG.debug("create_router: router=%s" % (router))
@@ -219,7 +244,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
     def _update_tn_router_route(self, context, router_id, routes=[], del_all=False):
 
         # del route
-        old_routes = tnos_router.get_static_route(context, router_id=router_id)
+        old_routes = tnos_router.get_static_routes(context, router_id=router_id)
         for old_route in old_routes:
             flag = False
             for new_route in routes:
@@ -242,7 +267,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
             db_route = tnos_router.get_static_route(context, router_id=router_id, dest=dest[0], prefix=dest[1], next_hop=next_hop)
             LOG.debug('db route: %s',db_route)
-            if db_route == []:
+            if db_route is None:
                 tnos_router.add_static_route(context, router_id, dest[0], dest[1], next_hop)
 
     def delete_router(self, context, id):
@@ -322,7 +347,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
         client = tnos_router.get_tn_client(context, router_id)
         if port['device_owner'] in [neu_l3_db.DEVICE_OWNER_ROUTER_GW]:
-            tn_intf = tnos_router.add_intf(context, router_id, port, True)
+            tn_intf = tnos_router.add_intf(context, router_id, port['id'], True)
             if tn_intf is not None:
                 tnos_router.cfg_intf_ip(context, router_id, tn_intf, ip+'/24')
 
@@ -333,7 +358,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
                 tnos_firewall.TNSnatRule.add_apply(context, client, default_snat)
 
         else:
-            tn_intf = tnos_router.add_intf(context, router_id, port, False)
+            tn_intf = tnos_router.add_intf(context, router_id, port['id'], False)
             if tn_intf is not None:
                 tnos_router.cfg_intf_ip(context, router_id, tn_intf, ip+'/24')
 

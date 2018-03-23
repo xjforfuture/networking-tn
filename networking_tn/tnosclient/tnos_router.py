@@ -10,6 +10,7 @@ from networking_tn.ovsctl import ovsctl
 from networking_tn.common import config
 from networking_tn.tnosclient import templates
 from networking_tn.db import tn_db
+from networking_tn.common import config
 
 if __name__ == '__main__':
     sys.path.append(r'/home/xiongjun/work/networking-tn/')
@@ -43,9 +44,9 @@ def tn_router_id_convert(router_id):
     return id
 
 
-def wait_for_ovs(context, port):
+def wait_for_ovs(context, port_id):
     for i in range(10):
-        (port_name, tag) = ovsctl.get_port_tag(context, port['id'])
+        (port_name, tag) = ovsctl.get_port_tag(context, port_id)
 
         if port_name is None or tag == [] or tag is None:
             time.sleep(3)
@@ -126,7 +127,7 @@ def get_tn_router(context, router_id):
     return tn_db.query_record(context, tn_db.Tn_Router, id=router_id)
 
 def get_tn_routers(context, **kwargs):
-    return tn_db.query_record(context, tn_db.Tn_Router, **kwargs)
+    return tn_db.query_records(context, tn_db.Tn_Router, **kwargs)
 
 def tn_router_is_exist(router_id):
     return tn_drv.vm_is_exist(router_id)
@@ -177,16 +178,16 @@ def init_intf(router_priv_id, manage_ip):
 
     subprocess.Popen(cmd, shell=True)
 
-def add_intf(context, router_id, port, is_gw):
+def add_intf(context, router_id, port_id, is_gw):
 
-    LOG.debug(port)
+    LOG.debug(port_id)
 
-    (port_name, tag) = wait_for_ovs(context, port)
+    (port_name, tag) = wait_for_ovs(context, port_id)
     if port_name is None:
         return None
 
     router = get_tn_router(context, router_id)
-    intf = get_intf(context, id=port['id'])
+    intf = get_intf(context, id=port_id)
     if is_gw:
         extern_name = get_extern_intf_name(GW_INTF, router.priv_id)
         inner_name = get_inner_intf_name(GW_INTF)
@@ -195,11 +196,11 @@ def add_intf(context, router_id, port, is_gw):
         ovsctl.add_access_port_tag(context, extern_name, tag)
 
         if intf is None:
-            intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
+            intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port_id, router_id=router_id,
                                     extern_name=extern_name, inner_name=inner_name, state='up',
                                     vlan_id=tag, is_gw='True', is_sub='False')
         else:
-            tn_db.update_record(context, intf, id=port['id'], router_id=router_id,
+            tn_db.update_record(context, intf, id=port_id, router_id=router_id,
                                     extern_name=extern_name, inner_name=inner_name, state='up',
                                     vlan_id=tag, is_gw='True', is_sub='False')
 
@@ -220,11 +221,11 @@ def add_intf(context, router_id, port, is_gw):
         sub_inner_name = get_inner_intf_name(ROUTER_INTF, tag)
 
         if intf is None:
-            intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port['id'], router_id=router_id,
+            intf = tn_db.add_record(context, tn_db.Tn_Interface, id=port_id, router_id=router_id,
                                     extern_name=extern_name, inner_name=sub_inner_name, state='up',
                                     vlan_id=tag, is_gw='False', is_sub='True')
         else:
-            tn_db.update_record(context, intf, id=port['id'], router_id=router_id,
+            tn_db.update_record(context, intf, id=port_id, router_id=router_id,
                                     extern_name=extern_name, inner_name=sub_inner_name, state='up',
                                     vlan_id=tag, is_gw='False', is_sub='True')
 
@@ -264,6 +265,8 @@ def del_intf(context, router_id, intf_id):
 def get_intf(context, **kwargs):
     return tn_db.query_record(context, tn_db.Tn_Interface, **kwargs)
 
+def get_intfs(context, **kwargs):
+    return tn_db.query_records(context, tn_db.Tn_Interface, **kwargs)
 
 def get_intf_info(context, router_id):
     api_client = get_tn_client(context, router_id)
@@ -294,8 +297,10 @@ def add_static_route(context, router_id, dest, prefix, next_hop):
     except Exception:
         raise
     else:
-        tn_db.add_record(context, tn_db.Tn_Static_Route,
-                         router_id=router_id, dest=dest, prefix=prefix, next_hop=next_hop)
+        route = get_static_route(context, router_id=router_id, dest=dest, prefix=prefix, next_hop=next_hop)
+        if route is None:
+            tn_db.add_record(context, tn_db.Tn_Static_Route,
+                             router_id=router_id, dest=dest, prefix=prefix, next_hop=next_hop)
 
 
 def del_static_route(context, router_id, dest, prefix, next_hop):
@@ -308,8 +313,11 @@ def del_static_route(context, router_id, dest, prefix, next_hop):
         tn_db.delete_record(context, tn_db.Tn_Static_Route,
                             router_id=router_id, dest=dest, prefix=prefix, next_hop=next_hop)
 
-
 def get_static_route(context, **kwargs):
+    return tn_db.query_records(context, tn_db.Tn_Static_Route, **kwargs)
+
+
+def get_static_routes(context, **kwargs):
     return tn_db.query_records(context, tn_db.Tn_Static_Route, **kwargs)
 
 
