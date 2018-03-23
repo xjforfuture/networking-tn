@@ -107,7 +107,7 @@ class TNL3ServicePlugin(router.L3RouterPlugin):
 
             gateway = router['router'].get('external_gateway_info')
             if gateway is not None:
-                self._update_tn_router_gw(context, id, gateway, rlt)
+                self._update_tn_router_gw(context, router_id, gateway, rlt)
 
         except Exception as e:
             LOG.error("Failed to create_router router=%(router)s",
